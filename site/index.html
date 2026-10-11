@@ -51,6 +51,8 @@
   --sans:Archivo,"Helvetica Neue",Arial,sans-serif;
   --serif:Newsreader,Georgia,"Times New Roman",serif;
   --ease:cubic-bezier(.16,1,.3,1);
+  --bar:60px;
+  --bar-type:21px;
 }
 *{box-sizing:border-box}
 html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
@@ -60,6 +62,23 @@ p{margin:0}
 ::selection{background:var(--logic);color:var(--light)}
 :focus-visible{outline:2px solid var(--logic);outline-offset:3px}
 .arr{width:.62em;height:.62em;stroke:currentColor;stroke-width:1.6;fill:none;vertical-align:.04em;margin-left:.12em;overflow:visible}
+
+/* ---------- bar ---------- */
+.bar{position:fixed;z-index:10;top:0;left:0;right:0;height:calc(var(--bar) + env(safe-area-inset-top));
+  padding:env(safe-area-inset-top) max(var(--m),env(safe-area-inset-right)) 0 max(var(--m),env(safe-area-inset-left));
+  display:flex;align-items:center;justify-content:space-between;gap:16px;
+  background:var(--paper);box-shadow:0 1px 0 rgba(27,23,20,.1);color:var(--ink);text-decoration:none;
+  transform:translateY(-101%);transition:transform .55s var(--ease)}
+.bar.on{transform:none}
+html:not(.js) .bar{display:none}
+.bar-name{font:900 var(--bar-type)/1 var(--sans);letter-spacing:-.03em;transform:translateY(.5em);opacity:0;transition:transform .7s var(--ease) .08s,opacity .5s ease .08s}
+.bar.on .bar-name{transform:none;opacity:1}
+.mark{position:relative;flex:0 0 auto;height:calc(var(--bar) * .52);aspect-ratio:1.1547}
+.mark canvas,.mark img{position:absolute;inset:0;width:100%;height:100%;display:block}
+.mark img{display:none}
+.mark.nogl img{display:block}
+.mark.nogl canvas{display:none}
+html{scroll-padding-top:var(--bar)}
 
 /* ---------- opening ---------- */
 .hero{
@@ -101,10 +120,11 @@ section,.back{position:relative;padding:clamp(80px,11vw,176px) var(--m) 0}
 .facts a{color:var(--ink);text-underline-offset:3px}
 
 /* ---------- thesis ---------- */
-.title{margin:0 0 clamp(40px,5vw,80px);font-weight:400;line-height:1}
+.title{margin:0 0 clamp(40px,5vw,80px);font-weight:400;line-height:1;container-type:inline-size}
 .title .fit{display:block;width:max-content;font:500 100px/.8 var(--sans);letter-spacing:.04em;white-space:nowrap}
-.title .l1{color:var(--logic)}
-.title .l3{color:var(--agent)}
+/* fitTitle() sets exact sizes; these are the same fit from measured em-widths (5.996, 5.379), for a reader without JS */
+.title .l1{color:var(--logic);font-size:16.6cqi}
+.title .l3{color:var(--agent);font-size:18.5cqi}
 .title .spread{display:flex;align-items:center;gap:.7em;font:500 clamp(18px,2.6vw,40px)/1 var(--sans);margin:.3em 0 .32em;color:var(--logic)}
 .title .isa{letter-spacing:.62em;margin-right:-.62em}
 .title .ln{flex:1;height:2px;background:linear-gradient(90deg,var(--logic),var(--agent));margin-left:.4em}
@@ -180,6 +200,7 @@ section,.back{position:relative;padding:clamp(80px,11vw,176px) var(--m) 0}
 
 /* ---------- narrow ---------- */
 @media (max-width:860px){
+  :root{--bar:54px;--bar-type:19px}
   .hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;grid-template-areas:"intro" "art" "stance";min-height:0;padding-bottom:0}
   .art{aspect-ratio:1.1547;min-height:0;margin-top:clamp(36px,9vw,64px)}
   .stance{max-width:none;margin-top:clamp(28px,7vw,48px)}
@@ -192,6 +213,11 @@ section,.back{position:relative;padding:clamp(80px,11vw,176px) var(--m) 0}
 </style>
 </head>
 <body>
+
+<a class="bar" href="#top" aria-label="Lewis Thompson, back to the top" aria-hidden="true" inert>
+  <span class="bar-name">Lewis Thompson</span>
+  <span class="mark"><canvas></canvas><img src="favicon.svg" alt=""></span>
+</a>
 
 <header class="hero" id="top">
   <div class="intro">
@@ -300,18 +326,25 @@ function actor(el, step) { const a = { visible: false, step }; el._actor = a; ac
    by a random threshold on the spray's density, which is
    what airbrush droplets look like, so building the density
    literally sprays it on.
+
+   Once it has landed, the corners pour into each other like
+   three slow streams of sand. Each ink has its own field of
+   grains, and each field drifts steadily away from its corner,
+   so violet sifts down from the apex while pink and teal rise
+   from the base. A grain thins out as it travels into its
+   neighbour's colour, and where two inks meet, two currents
+   pass through one another.
    ========================================================= */
-function triangle() {
-  const art = $('.art'), cv = $('canvas', art);
-  const gl = cv.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
-  if (!gl) { art.classList.add('nogl'); return; }
-  const VS = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
-  const FS = `precision highp float;
+const TRI_FS = `precision highp float;
 uniform vec2 uRes;uniform float uDpr;uniform vec2 uV[3];uniform vec3 uInk[3];uniform vec3 uPaper,uLight;
-uniform vec3 uLo,uReach;uniform float uSpan,uGlow,uT;
+uniform vec3 uLo,uReach;uniform float uSpan,uGlow,uT,uStoch;uniform vec2 uFlow[3];
 float h12(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
 float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
   return mix(mix(h12(i),h12(i+vec2(1,0)),f.x),mix(h12(i+vec2(0,1)),h12(i+vec2(1,1)),f.x),f.y);}
+// grain: a per-device-pixel random value, tiled every 1024 px so the drift can
+// wrap without a seam (mediump-safe), with a little 2 px clumping
+float grain(vec2 x){x=floor(x);
+  return mix(h12(mod(x,1024.)),h12(mod(floor(x*.5),512.)+71.3),.35);}
 float sdTri(vec2 p,vec2 p0,vec2 p1,vec2 p2){
   vec2 e0=p1-p0,e1=p2-p1,e2=p0-p2,v0=p-p0,v1=p-p1,v2=p-p2;
   vec2 q0=v0-e0*clamp(dot(v0,e0)/dot(e0,e0),0.,1.),q1=v1-e1*clamp(dot(v1,e1)/dot(e1,e1),0.,1.),q2=v2-e2*clamp(dot(v2,e2)/dot(e2,e2),0.,1.);
@@ -342,40 +375,73 @@ void main(){
   vec3 w=f/max(S,1e-4);
   vec3 base=mix(uPaper,uLight,uGlow);
   vec3 even=mix(base,w.x*uInk[0]+w.y*uInk[1]+w.z*uInk[2],D);
-  float r1=mix(h12(fc),h12(floor(fc*.5)+71.3),.35),r2=h12(fc+19.7);
-  vec3 drop=r1<D?(r2<w.x?uInk[0]:(r2<w.x+w.y?uInk[1]:uInk[2])):base;
-  gl_FragColor=vec4(mix(uPaper,mix(even,drop,.8),cov),1.);
+  // three drifting grain fields, one per ink. The pixel takes ink 0 if its
+  // grain lands, else ink 1, else ink 2, each threshold conditioned on the
+  // ones before, so each ink still covers exactly D*w of the face
+  vec3 c=D*w;
+  vec3 drop=base;
+  if(grain(fc-uFlow[0])<c.x)drop=uInk[0];
+  else if(grain(fc-uFlow[1]+vec2(331.,97.))*(1.-c.x)<c.y)drop=uInk[1];
+  else if(grain(fc-uFlow[2]+vec2(613.,449.))*(1.-c.x-c.y)<c.z)drop=uInk[2];
+  gl_FragColor=vec4(mix(uPaper,mix(even,drop,uStoch),cov),1.);
 }`;
+
+// One sprayed triangle on one canvas: equilateral, standing on the bottom of
+// its box, as wide as the box allows. The hero and the logomark each own one.
+// The hero caps at DPR 2 for the GPU's sake; the mark is tiny enough to render
+// at full density, so a 3x phone never sees its droplets resampled.
+function sprayer(cv, maxDpr = 2) {
+  const gl = cv.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
+  if (!gl) return null;
   const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
     if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
-  let prog;
-  try {
-    prog = gl.createProgram();
-    gl.attachShader(prog, sh(gl.VERTEX_SHADER, VS)); gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, FS));
-    gl.linkProgram(prog);
-    if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-  } catch (err) { console.warn(err); art.classList.add('nogl'); return; }
+  const prog = gl.createProgram();
+  gl.attachShader(prog, sh(gl.VERTEX_SHADER, 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'));
+  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, TRI_FS));
+  gl.linkProgram(prog);
+  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
   gl.useProgram(prog);
   const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
   gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
   const U = n => gl.getUniformLocation(prog, n);
-  const u = { res: U('uRes'), dpr: U('uDpr'), v: U('uV'), lo: U('uLo'), reach: U('uReach'), span: U('uSpan'), glow: U('uGlow'), t: U('uT') };
+  const u = { res: U('uRes'), dpr: U('uDpr'), v: U('uV'), lo: U('uLo'), reach: U('uReach'), span: U('uSpan'), glow: U('uGlow'),
+              t: U('uT'), stoch: U('uStoch'), flow: U('uFlow') };
   gl.uniform3fv(U('uInk'), [...rgb('logic'), ...rgb('human'), ...rgb('agent')]);
   gl.uniform3fv(U('uPaper'), rgb('paper')); gl.uniform3fv(U('uLight'), rgb('light'));
-
-  // equilateral, standing on the bottom of its box, as wide as the box allows
-  let W = 0, H = 0, dpr = 1, V = [[0, 0], [0, 0], [0, 0]], side = 1;
-  function layout() {
-    const r = art.getBoundingClientRect();
-    W = Math.max(1, r.width); H = Math.max(1, r.height);
-    dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+  const s = { W: 1, H: 1, dpr: 1, V: [[0, 0], [0, 0], [0, 0]], side: 1, dirs: [] };
+  s.layout = () => {
+    const r = cv.getBoundingClientRect();
+    s.W = Math.max(1, r.width); s.H = Math.max(1, r.height);
+    s.dpr = Math.min(maxDpr, window.devicePixelRatio || 1);
+    cv.width = Math.round(s.W * s.dpr); cv.height = Math.round(s.H * s.dpr);
     gl.viewport(0, 0, cv.width, cv.height);
-    side = Math.min(W, H / 0.8660254);
-    const h = side * 0.8660254, x0 = (W - side) / 2;
-    V = [[x0 + side / 2, H - h], [x0, H], [x0 + side, H]];
-  }
+    const side = s.side = Math.min(s.W, s.H / 0.8660254), h = side * 0.8660254, x0 = (s.W - side) / 2;
+    const V = s.V = [[x0 + side / 2, s.H - h], [x0, s.H], [x0 + side, s.H]];
+    // each ink's grains pour from its corner toward the centre, in device
+    // pixels with y up (the grain lives in gl_FragCoord space)
+    const C = [(V[0][0] + V[1][0] + V[2][0]) / 3, (V[0][1] + V[1][1] + V[2][1]) / 3];
+    s.dirs = V.map(([x, y]) => { const dx = C[0] - x, dy = C[1] - y, L = Math.hypot(dx, dy); return [dx / L, -dy / L]; });
+  };
+  const flow = new Float32Array(6);
+  // f: { t, lo[3], reach[3], glow, span, stoch, pour (css px of drift so far) }
+  s.draw = f => {
+    // the drift wraps at the grain's 1024 px tile, so it never loses precision
+    s.dirs.forEach(([dx, dy], i) => { const d = f.pour * s.dpr; flow[i * 2] = (dx * d) % 1024; flow[i * 2 + 1] = (dy * d) % 1024; });
+    gl.uniform2f(u.res, s.W, s.H); gl.uniform1f(u.dpr, s.dpr); gl.uniform2fv(u.v, s.V.flat());
+    gl.uniform3fv(u.lo, f.lo); gl.uniform3fv(u.reach, f.reach); gl.uniform1f(u.span, f.span);
+    gl.uniform1f(u.glow, f.glow); gl.uniform1f(u.t, f.t); gl.uniform1f(u.stoch, f.stoch);
+    gl.uniform2fv(u.flow, flow);
+    gl.drawArrays(gl.TRIANGLES, 0, 3);
+  };
+  s.gl = gl;
+  return s;
+}
+
+function triangle() {
+  const art = $('.art'), cv = $('canvas', art);
+  const T = sprayer(cv);
+  if (!T) { art.classList.add('nogl'); return; }
 
   // the reader is a fourth presence: the corner nearest the pointer reaches a
   // little further into the face, on a critically damped spring
@@ -386,6 +452,11 @@ void main(){
     const r = art.getBoundingClientRect(); tx = e.clientX - r.left; ty = e.clientY - r.top; tp = 1; wake();
   });
   hero.addEventListener('pointerleave', () => { tp = 0; wake(); });
+
+  // The pour: grains drift at POUR css px a second once the spray has landed,
+  // easing up from still over a couple of seconds so the build stays a build.
+  const POUR = 9, POUR0 = 2.2, POUR_EASE = 2.5;
+  const pour = t => reduced ? 0 : POUR * (t < POUR0 ? 0 : t - POUR0 < POUR_EASE ? (t - POUR0) ** 2 / (2 * POUR_EASE) : t - POUR0 - POUR_EASE / 2);
 
   // the entrance clock starts on the first frame the page is actually seen,
   // so a link opened in a background tab still sprays when it's looked at
@@ -400,31 +471,68 @@ void main(){
       const e = reduced ? 1 : easeOut((t - 0.3 - i * 0.32) / 1.5);
       reach.push(lerp(0, 1.8, e));
       const breathe = 0.016 * Math.sin(t * 0.23 + i * 2.1) + 0.008 * Math.sin(t * 0.097 + i * 4.3);
-      const d = Math.hypot(px - V[i][0], py - V[i][1]) / side;
+      const d = Math.hypot(px - T.V[i][0], py - T.V[i][1]) / T.side;
       const lean = 0.045 * pp * Math.exp(-d * d * 2.4);
       return lerp(0.7, LO, e) + (breathe - lean) * e;
     });
-    gl.uniform2f(u.res, W, H); gl.uniform1f(u.dpr, dpr);
-    gl.uniform2fv(u.v, V.flat()); gl.uniform3fv(u.lo, lo); gl.uniform3fv(u.reach, reach); gl.uniform1f(u.span, SPAN);
-    gl.uniform1f(u.glow, reduced ? 1 : easeOut(t / 0.9)); gl.uniform1f(u.t, t);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
+    T.draw({ t, lo, reach, span: SPAN, glow: reduced ? 1 : easeOut(t / 0.9), stoch: 0.8, pour: pour(t) });
   }
-  layout();
+  T.layout();
   const a = actor(art, now => {
     const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
     const K = 14, D = 2 * Math.sqrt(K);
     vx += (K * (tx - px) - D * vx) * dt; vy += (K * (ty - py) - D * vy) * dt; vp += (K * (tp - pp) - D * vp) * dt;
     px += vx * dt; py += vy * dt; pp += vp * dt;
-    const moving = (Math.abs(vx) + Math.abs(vy)) / side + Math.abs(vp) + Math.abs(tp - pp) > 0.002;
+    const moving = (Math.abs(vx) + Math.abs(vy)) / T.side + Math.abs(vp) + Math.abs(tp - pp) > 0.002;
     const building = t0 === null || now - t0 < BUILD + 100;
     if (reduced) { if (last < 0) { draw(now); last = now; } return false; }
-    // after the build: ~15 fps is plenty for a drift this slow
-    if (building || moving || now - last > 66) { draw(now); last = now; }
+    // after the build, 24 fps keeps a drift of ~9 px/s moving as sand, not steps
+    if (building || moving || now - last > 41) { draw(now); last = now; }
     return true;
   });
-  new ResizeObserver(() => { layout(); last = -1e9; draw(performance.now()); }).observe(art);
+  new ResizeObserver(() => { T.layout(); last = -1e9; draw(performance.now()); }).observe(art);
   cv.addEventListener('webglcontextlost', e => { e.preventDefault(); actors.delete(a); art.classList.add('nogl'); });
   a.visible = true; draw(performance.now()); wake();
+}
+
+/* =========================================================
+   The bar: once the name has scrolled away it waits at the
+   top, with the triangle as a logomark. The mark is the same
+   shader, quieter: it sprays in once, then pours at a third of
+   the hero's pace.
+   ========================================================= */
+function bar() {
+  const el = $('.bar'), name = $('.name'), mark = $('.mark', el);
+  let shown = false, M = null, mt0 = null, last = -1e9;
+  function show(on) {
+    if (on === shown) return;
+    shown = on; el.classList.toggle('on', on);
+    el.toggleAttribute('inert', !on); el.setAttribute('aria-hidden', String(!on));
+    if (on && M) { if (mt0 === null) mt0 = performance.now(); wake(); }
+  }
+  const io = new IntersectionObserver(([e]) => show(!e.isIntersecting && e.boundingClientRect.top < 0),
+    { rootMargin: `-${el.offsetHeight || 56}px 0px 0px 0px` });
+  io.observe(name);
+  try { M = sprayer($('canvas', mark), 3); } catch (e) { console.warn(e); M = null; }
+  if (!M) { mark.classList.add('nogl'); return; }
+  M.layout();
+  const LO = 0.13;
+  function draw(now) {
+    const t = mt0 === null ? 0 : (now - mt0) / 1000;
+    const e = reduced ? 1 : easeOut(t / 0.9);
+    const lo = [0, 1, 2].map(() => lerp(0.7, LO, e));
+    M.draw({ t, lo, reach: [0, 1, 2].map(() => lerp(0, 1.8, e)), span: 0.55, glow: e, stoch: 0.3, pour: reduced ? 0 : 3 * t });
+  }
+  const a = actor(mark, now => {
+    if (!shown) return false;
+    if (reduced) { if (last < 0) { draw(now); last = now; } return false; }
+    // the mark is small and slow: ten frames a second, full rate while it sprays in
+    if (now - mt0 < 1000 || now - last > 100) { draw(now); last = now; }
+    return true;
+  });
+  new ResizeObserver(() => { M.layout(); draw(performance.now()); }).observe(mark);
+  $('canvas', mark).addEventListener('webglcontextlost', e => { e.preventDefault(); actors.delete(a); mark.classList.add('nogl'); });
+  draw(performance.now());
 }
 
 /* =========================================================
@@ -772,6 +880,7 @@ function reveals() {
 
 requestAnimationFrame(() => $('.hero').classList.add('on'));
 try { triangle(); } catch (e) { console.warn(e); $('.art').classList.add('nogl'); }
+bar();
 jellyfish(); mesh(); diagram(); bands(); reveals();
 (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(fitTitle);
 fitTitle();
