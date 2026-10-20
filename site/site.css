@@ -80,8 +80,9 @@ body.down .back:not(.end) { opacity: 0; pointer-events: none; }
 body.away #rail { opacity: 0; pointer-events: none; }
 
 /* entrance: only with JS, and never for reduced motion. While the painting measures the layout, the entrance
-   offsets are lifted, or every ornament placed beside the text lands where the text is about to leave */
-.measuring section .text > * { transform: none !important; transition: none !important; }
+   offsets are lifted, or every ornament placed beside the text lands where the text is about to leave; only
+   for sections not yet in, so an entrance already playing (the hero's, from the first frame) isn't cut short */
+.measuring section:not(.on) .text > * { transform: none !important; transition: none !important; }
 .js section .text > * { opacity: 0; transform: translateY(16px); transition: opacity .55s ease, transform .55s cubic-bezier(.2, .7, .2, 1); }
 .js section.on .text > * { opacity: 1; transform: none; }
 .js section.on .text > :nth-child(2) { transition-delay: .06s; }

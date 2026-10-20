@@ -227,6 +227,59 @@ function lay(s) {
   return { B, D };
 }
 
+// Every bristle segment of every stroke, with the moment it is painted, sorted by that moment: pure arithmetic,
+// so the site runs it in a worker and only the upload touches the GPU
+export function layout(strokes) {
+  const all = strokes.slice().sort((a, b) => a.start - b.start), TOL = .04, SPAN = 1 / 120;
+  // points (x, y, r, t), depths, segments (point, info), bristle colours, segment times, in typed arrays grown
+  // by doubling, so the result leaves a worker without a copy
+  let P = new Float32Array(1 << 18), np = 0, D = new Float32Array(1 << 16), S = new Uint32Array(1 << 17), ns = 0, C = new Float32Array(1 << 14), nc = 0, when = new Float64Array(1 << 16);
+  const grow = (a, need) => { if (need <= a.length) return a; let n = a.length * 2; while (n < need) n *= 2; const g = new a.constructor(n); g.set(a); return g; };
+  for (const s of all) {
+    const { B, D: dep } = lay(s), n = s.path.n;
+    // when the brush reaches sample k: the clock time at which Stroke.reach first returns k
+    const T = new Float32Array(n);
+    for (let k = 0; k < n; k++) T[k] = s.start + s.dur * uAt(k / Math.max(1, n - 1), s.ease);
+    for (const b of B) {
+      const ib = nc >> 2, M = b.M, X = b.P, br = b.r, R = typeof br === 'number' ? () => br : k => br[k];
+      C = grow(C, nc + 4); C[nc] = b.col[0]; C[nc + 1] = b.col[1]; C[nc + 2] = b.col[2]; C[nc + 3] = b.gold ? b.a + 2 : b.over ? -b.a : b.a; nc += 4;
+      // does the chord i..j stand in for every sample between?
+      const straight = (i, j) => {
+        const ax = X[2 * i], ay = X[2 * i + 1], dx = X[2 * j] - ax, dy = X[2 * j + 1] - ay, l = Math.hypot(dx, dy) || 1;
+        for (let m = i + 1; m < j; m++) {
+          const u = (m - i) / (j - i);
+          if (Math.abs(((X[2 * m] - ax) * dy - (X[2 * m + 1] - ay) * dx) / l) > TOL || Math.abs(R(m) - lerp(R(i), R(j), u)) > TOL) return false;
+        }
+        return true;
+      };
+      for (let k = 0; k < n - 1; k++) {
+        if (!(M[k] & M[k + 1]) || (k && M[k - 1])) continue;   // k starts a run
+        let e = k + 1; while (e + 1 < n && M[e + 1]) e++;      // ... that ends at e
+        const V = [k];
+        for (let i = k; i < e;) { let j = i + 1; while (j < e && T[j + 1] - T[i] <= SPAN && straight(i, j + 1)) j++; V.push(j); i = j; }
+        const p0 = np >> 2, nv = V.length;
+        P = grow(P, np + 4 * nv); D = grow(D, p0 + nv);
+        for (const v of V) { D[np >> 2] = dep ? dep[v] : 1; P[np] = X[2 * v]; P[np + 1] = X[2 * v + 1]; P[np + 2] = R(v); P[np + 3] = T[v]; np += 4; }
+        S = grow(S, 2 * (ns + nv)); when = grow(when, ns + nv);
+        for (let i = 0; i < nv - 1; i++) {
+          S[2 * ns] = p0 + i; S[2 * ns + 1] = ib << 7 | b.mask << 3 | (b.clip ? 4 : 0) | (i === 0 ? 1 : 0) | (i === nv - 2 ? 2 : 0);
+          when[ns++] = T[V[i + 1]];
+        }
+        k = e - 1;
+      }
+    }
+  }
+  // counting sort by paint time, in quarter-frame buckets: cum[q] segments are painted by bucket q's end
+  let tmax = 0; for (let i = 0; i < ns; i++) if (when[i] > tmax) tmax = when[i];
+  const Q = 240, nq = Math.ceil(tmax * Q) + 2, cum = new Uint32Array(nq + 1);
+  const bucket = t => Math.min(nq - 1, Math.max(0, Math.ceil(t * Q)));
+  for (let i = 0; i < ns; i++) cum[bucket(when[i]) + 1]++;
+  for (let q = 0; q < nq; q++) cum[q + 1] += cum[q];
+  const at = cum.slice(), Ss = new Uint32Array(ns * 2);
+  for (let i = 0; i < ns; i++) { const o = at[bucket(when[i])]++; Ss[2 * o] = S[2 * i]; Ss[2 * o + 1] = S[2 * i + 1]; }
+  return { P: P.slice(0, np), D: D.slice(0, np >> 2), S: Ss, C: C.slice(0, nc), cum, Q, n: ns, stats: { strokes: all.length, bristles: nc >> 2, segments: ns, points: np >> 2 } };
+}
+
 export class Bristles {
   constructor(dev, format) {
     this.dev = dev; this.n = 0;
@@ -252,54 +305,14 @@ export class Bristles {
   // within TOL of its samples (bristles wobble slowly, so most chords span several 1.4-unit samples), but no
   // chord covers more than half a frame of the brush's travel, so the moving head never visibly jumps.
   // Segments are then sorted by when they get painted, so a frame draws only the painted prefix.
-  load(strokes) {
-    const all = strokes.slice().sort((a, b) => a.start - b.start), TOL = .04, SPAN = 1 / 120;
-    const P = [], D = [], S = [], C = [], when = [];   // points (x, y, r, t), depths, segments (point, info), bristle colours, segment times
-    for (const s of all) {
-      const { B, D: dep } = lay(s), n = s.path.n;
-      // when the brush reaches sample k: the clock time at which Stroke.reach first returns k
-      const T = new Float32Array(n);
-      for (let k = 0; k < n; k++) T[k] = s.start + s.dur * uAt(k / Math.max(1, n - 1), s.ease);
-      for (const b of B) {
-        const ib = C.length / 4, M = b.M, X = b.P, R = k => (typeof b.r === 'number' ? b.r : b.r[k]);
-        C.push(...b.col, b.gold ? b.a + 2 : b.over ? -b.a : b.a);
-        // does the chord i..j stand in for every sample between?
-        const straight = (i, j) => {
-          const ax = X[2 * i], ay = X[2 * i + 1], dx = X[2 * j] - ax, dy = X[2 * j + 1] - ay, l = Math.hypot(dx, dy) || 1;
-          for (let m = i + 1; m < j; m++) {
-            const u = (m - i) / (j - i);
-            if (Math.abs(((X[2 * m] - ax) * dy - (X[2 * m + 1] - ay) * dx) / l) > TOL || Math.abs(R(m) - lerp(R(i), R(j), u)) > TOL) return false;
-          }
-          return true;
-        };
-        for (let k = 0; k < n - 1; k++) {
-          if (!(M[k] & M[k + 1]) || (k && M[k - 1])) continue;   // k starts a run
-          let e = k + 1; while (e + 1 < n && M[e + 1]) e++;      // ... that ends at e
-          const V = [k];
-          for (let i = k; i < e;) { let j = i + 1; while (j < e && T[j + 1] - T[i] <= SPAN && straight(i, j + 1)) j++; V.push(j); i = j; }
-          const p0 = P.length / 4;
-          for (const v of V) { P.push(X[2 * v], X[2 * v + 1], R(v), T[v]); D.push(dep ? dep[v] : 1); }
-          for (let i = 0; i < V.length - 1; i++) {
-            S.push(p0 + i, ib << 7 | b.mask << 3 | (b.clip ? 4 : 0) | (i === 0 ? 1 : 0) | (i === V.length - 2 ? 2 : 0));
-            when.push(T[V[i + 1]]);
-          }
-          k = e - 1;
-        }
-      }
-    }
-    // counting sort by paint time, in quarter-frame buckets: cum[q] segments are painted by bucket q's end
-    const ns = when.length, Q = 240, nq = Math.ceil(when.reduce((a, t) => Math.max(a, t), 0) * Q) + 2, cum = new Uint32Array(nq + 1);
-    const bucket = t => Math.min(nq - 1, Math.max(0, Math.ceil(t * Q)));
-    for (const t of when) cum[bucket(t) + 1]++;
-    for (let q = 0; q < nq; q++) cum[q + 1] += cum[q];
-    const at = cum.slice(), Ss = new Uint32Array(ns * 2);
-    for (let i = 0; i < ns; i++) { const o = at[bucket(when[i])]++; Ss[2 * o] = S[2 * i]; Ss[2 * o + 1] = S[2 * i + 1]; }
-    this.cum = cum; this.Q = Q;
+  load(strokes) { this.upload(layout(strokes)); }
 
+  // a layout() result onto the GPU
+  upload(L) {
     for (const b of [this.pts, this.dep, this.seg, this.bri]) b?.destroy();
     const buf = a => { const g = this.dev.createBuffer({ size: Math.max(16, a.byteLength), usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST }); this.dev.queue.writeBuffer(g, 0, a); return g; };
-    this.pts = buf(new Float32Array(P)); this.dep = buf(new Float32Array(D)); this.seg = buf(Ss); this.bri = buf(new Float32Array(C));
-    this.n = ns; this.stats = { strokes: all.length, bristles: C.length / 4, segments: ns, points: P.length / 4 };
+    this.pts = buf(L.P); this.dep = buf(L.D); this.seg = buf(L.S); this.bri = buf(L.C);
+    this.cum = L.cum; this.Q = L.Q; this.n = L.n; this.stats = L.stats;
     this.bind();
   }
 
