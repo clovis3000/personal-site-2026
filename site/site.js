@@ -613,6 +613,21 @@ function playPlate(card) {
   card.append(v); v.play().catch(() => {});
 }
 
+// MAGI's record: progress through the prose is the paragraph under the reading line plus how far it has got
+// toward the next; each page lands at its own point in that, the third paragraph scatters them, the fourth
+// gathers them up
+function docs() {
+  const el = st.open >= 0 && $(`article[data-p=${PROJ[st.open]}] [data-docs]`, detail);
+  if (!el) return;
+  const ps = $$('.prose p', el), line = vh * .62, tops = ps.map(q => q.getBoundingClientRect().top);
+  let p = -1;
+  tops.forEach((t, k) => { if (t <= line) p = k + clamp((line - t) / ((tops[k + 1] ?? t + ps[k].offsetHeight + vh * .3) - t)); });
+  const desk = $('.desk', el);
+  $$('img', desk).forEach(im => im.classList.toggle('in', p >= +im.dataset.at));
+  desk.classList.toggle('apart', p >= 2 && p < 3);
+  desk.classList.toggle('gather', p >= 3);
+}
+
 function buildProject(i) {
   if (D[i].ready) return;
   const { S, masks, demo, sea } = compose(i); D[i].masks = masks; D[i].load(S); D[i].ready = true; D[i].demo = demo; D[i].sea = sea; D[i].seaP = 0;
@@ -646,7 +661,7 @@ else {
     const fig = st.open >= 0 && $(`article[data-p=${PROJ[st.open]}] [data-demo]`, detail);
     if (fig && fig.offsetTop < detail.scrollTop + vh * .8) st.drev = 1;
     document.body.classList.toggle('down', detail.scrollTop > vh * .2);
-    reel();
+    reel(); docs();
     need();
   }, { passive: true });
   addEventListener('pointermove', e => { st.ptr = [e.clientX, e.clientY]; need(); });

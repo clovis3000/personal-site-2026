@@ -136,10 +136,22 @@
         <div class="mon lg" data-mon="delta"></div>
         <h1>Project MAGI</h1>
         <a class="visit" href="https://projectmagi.app" target="_blank" rel="noopener">projectmagi.app</a>
-        <p class="lede">The government’s UAP releases arrive as bulk ZIPs and page-at-a-time viewers. MAGI ingests them, extracts entities, and joins everything into one mesh where every assertion resolves to a page and a span in the original. It takes no position on what UAPs are.</p>
-        <p>The pipeline runs OCR, then named-entity extraction, then embeddings, on rented GPUs. Each page gets a quality score, clean, garbled or empty, so bad OCR is counted rather than hidden. Original files live on disk addressed by hash; Postgres holds the text, entities and pgvector embeddings.</p>
-        <p>Corpus-extracted data, editorial data and user data are separate provenance tiers that never share a table, so a user’s theory can never sit beside an entity extracted from a government document.</p>
-        <p>Its rules came from real mistakes. Don’t store a value more precisely than its source states it. Don’t let a parser fall back to a coarser reading when it fails: return nothing and count it. Don’t present filing density as incident density. The record measures the paperwork, not the phenomenon.</p>
+      </div>
+      <div class="docs" data-docs>
+        <div class="prose">
+          <p>Why the UFO files? Because it is a fascinating and rich problem — over 100,000 documents, some natively digital PDFs (easy to read), some damaged and faded scans nearly 80 years old. Different categories of documents: tables, material research, teletyped military reports, handwritten scribbles, administrative leaflets, newspaper clippings.</p>
+          <p>Within these documents are eyewitness accounts, testimony from high-ranking officials and members of the private sector, minutes from meetings with famous physicists, and the ramblings of crackpots and excited reporters.</p>
+          <p>Furthermore — some of the documents reference the same events, the same people and the same places, but they have been scattered across the files of different departments and organisations, in different formats, and kept classified for decades.</p>
+          <p>The goal of Project MAGI is to digest these documents, construct a mesh that draws what links can be drawn, perform summary and entity extraction, and make this data available to humans in a powerful GUI and to AI agents in an efficient MCP.</p>
+        </div>
+        <div class="desk">
+          <img src="record/carbon.webp" data-at="0" style="--x:-3vw; --y:-2svh; --r:-4deg; --ax:-11vw; --ay:-21svh; --ar:-8deg; --gx:-9.5vw; --gy:-12svh" alt="An FBI carbon copy, faded almost past reading" loading="lazy" decoding="async">
+          <img src="record/chart.webp" class="wide" data-at=".33" style="--x:2vw; --y:5svh; --r:3deg; --ax:10vw; --ay:-24svh; --ar:6deg; --gx:0vw; --gy:-12svh" alt="Project Blue Book Special Report 14: a chart of sightings by evaluation for each year from 1947 to 1952" loading="lazy" decoding="async">
+          <img src="record/clipping.webp" data-at=".66" style="--x:-1vw; --y:1svh; --r:-1.5deg; --ax:-12vw; --ay:17svh; --ar:5deg; --gx:9.5vw; --gy:-12svh" alt="A 1957 Omaha World-Herald clipping, Space-Ship Story Raises Eyebrows, filed by the FBI with handwritten notes" loading="lazy" decoding="async">
+          <img src="record/teletype.webp" data-at="1" style="--x:3vw; --y:-3svh; --r:4deg; --ax:1vw; --ay:-1svh; --ar:-3deg; --gx:-9.5vw; --gy:12svh" alt="A 1947 FBI teletype on pink paper: a couple at Dow Chemical report a burning ball of white and a can of fused sand" loading="lazy" decoding="async">
+          <img src="record/minutes.webp" data-at="1.33" style="--x:-4vw; --y:3svh; --r:-3deg; --ax:12vw; --ay:16svh; --ar:9deg; --gx:0vw; --gy:12svh" alt="Minutes of the 1949 Los Alamos conference on aerial phenomena, with Edward Teller among those present" loading="lazy" decoding="async">
+          <img src="record/letter.webp" data-at="1.66" style="--x:1vw; --y:0svh; --r:2deg; --ax:-1vw; --ay:25svh; --ar:-10deg; --gx:9.5vw; --gy:12svh" alt="A handwritten 1947 letter to the FBI from a member of the public" loading="lazy" decoding="async">
+        </div>
       </div>
       <section class="insert" data-insert data-demo>
         <div class="sheet">

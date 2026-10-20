@@ -187,3 +187,27 @@ body.away #rail { opacity: 0; pointer-events: none; }
   .reeltext { top: 58svh; left: 22px; right: 22px; font-size: 19px; }
   .ways { margin-top: 5svh; }
 }
+
+/* MAGI's record: the prose reads down the left; beside it a desk pinned in place, where a page of the real
+   record lands for each kind of document the prose names. The third paragraph scatters them across the desk,
+   the fourth gathers them into a neat block, ready for the pipeline below. Without JS the pile simply shows. */
+.docs { position: relative; display: grid; grid-template-columns: minmax(0, 31em) minmax(0, 1fr); column-gap: 4vw; margin: -12svh var(--pad) 6svh calc(var(--pad) + 8vw); }
+.docs .prose { padding: 4svh 0 34svh; }
+.docs .prose p { font-size: clamp(19px, 1.4vw, 23px); line-height: 1.55; margin: 0 0 52svh; }
+.docs .prose p:last-child { margin-bottom: 0; }
+.desk { position: sticky; top: 8svh; height: 84svh; align-self: start; }
+.desk img { position: absolute; left: 50%; top: 50%; height: 64svh; width: auto; transform: translate(-50%, -50%) translate(var(--x), var(--y)) rotate(var(--r)); filter: drop-shadow(0 1px 1px rgba(28, 25, 23, .18)) drop-shadow(0 10px 18px rgba(28, 25, 23, .12)); transition: transform .7s cubic-bezier(.2, .7, .2, 1), opacity .45s ease; will-change: transform; }
+.desk img.wide { height: auto; width: min(36vw, 600px); }
+.js .desk img { opacity: 0; transform: translate(-50%, -50%) translate(var(--x), calc(var(--y) + 9svh)) rotate(calc(var(--r) * 2.5)); }
+.js .desk img.in { opacity: 1; transform: translate(-50%, -50%) translate(var(--x), var(--y)) rotate(var(--r)); }
+.js .desk.apart img.in { transform: translate(-50%, -50%) translate(var(--ax), var(--ay)) rotate(var(--ar)) scale(.5); }
+.js .desk.gather img.in { transform: translate(-50%, -50%) translate(var(--gx), var(--gy)) scale(.3); }
+@media (prefers-reduced-motion: reduce) { .desk img { transition: opacity .2s; } }
+@media (max-width: 820px) {
+  .docs { display: flex; flex-direction: column; margin: 0 22px 6svh; }
+  .desk { order: -1; top: 4svh; height: 46svh; z-index: 0; }
+  .desk img { height: 38svh; }
+  .desk img.wide { width: 72vw; }
+  .docs .prose { position: relative; z-index: 1; }
+  .docs .prose p { background: rgba(255, 255, 255, .94); padding: 14px 0; margin-bottom: 44svh; }
+}
