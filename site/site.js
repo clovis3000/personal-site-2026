@@ -34,6 +34,7 @@ const D = [];   // each project's page has its own layer, built in idle time onc
 function compose(only = null) {
   vw = innerWidth; vh = innerHeight;
   const S = [], masks = []; let id = 0, demo = null, sea = null;
+  const phone = vw <= 820;   // the phone layout: the same breakpoint as the CSS's, so painting and text agree
   const r = rng(7);
   const add = o => { const s = new Stroke({ seed: 7919 + ++id, blend: 'source-over', ...o }); S.push(s); return s; };
   const K = kit(add, r);
@@ -267,7 +268,7 @@ function compose(only = null) {
     const rp = Rr * .1, [px, py] = at(Rr * (1.055 + .02) + rp * 1.2 - rp * .25, .19);
     gear(px, py, rp, 12, T + .6, .2);
     const r2 = Rr * .062, a2 = Math.atan2(cy - py, cx - px) + 1.9, d2 = (rp + r2) * 1.08;
-    gear(px + Math.cos(a2) * d2, py + Math.sin(a2) * d2, r2, 8, T + .75, .4);
+    if (!phone) gear(px + Math.cos(a2) * d2, py + Math.sin(a2) * d2, r2, 8, T + .75, .4);   // on a phone it would hang off the edge
 
     // the bands: vermilion for the signs, blue for the stars, white for the tiles, blue for the sun
     const mV = mask(3, cx, cy, Rr * .93, 0), m1 = mask(3, cx, cy, Rr * .86, 0), m2 = mask(3, cx, cy, Rr * .64, 0), m3 = mask(3, cx, cy, Rr * .5, 0);
@@ -439,13 +440,24 @@ function compose(only = null) {
     if (sec.dataset.sec === 'write') {
       // vines at the top right and the bottom left, to close the book: the top one runs along, the bottom one up
       const H = wr(sec);
-      corner(H.x + H.w - 1, H.y, -1, 1, [Math.min(560, vw * .34), Math.min(240, vh * .26)], T + .5, 2);
-      corner(H.x, H.y + H.h, 1, -1, [Math.min(220, vw * .16), Math.min(620, vh * .62)], T + .7, 3);
+      // the top one hangs from the top of the last screen, not the section's, and stands in from the edges so its
+      // outward leaves aren't cut off
+      const top = Math.max(H.y, H.y + H.h - vh);
+      if (phone) {
+        // a phone: short sprays, one over the heading's right, one under the arch, clear of both
+        corner(H.x + H.w - 1 - 8, top + 10, -1, 1, [vw * .46, 96], T + .5, 2);
+        corner(H.x, H.y + H.h, 1, -1, [vw * .62, 84], T + .7, 3);
+      } else {
+        corner(H.x + H.w - 1 - 26, top + 30, -1, 1, [Math.min(540, vw * .33), Math.min(230, vh * .25)], T + .5, 2);
+        corner(H.x, H.y + H.h, 1, -1, [Math.min(220, vw * .16), Math.min(620, vh * .62)], T + .7, 3);
+      }
     }
     if (sec.dataset.sec === 'hero') {
       // the hero's counterweight, a small vermilion block below the square; a vine in the page's top-left corner
       const R = wr($('[data-plane]', sec)), H = wr(sec);
-      corner(H.x, H.y, 1, 1, [Math.min(260, vw * .15), Math.min(760, vh * .8)], T + .3, 0);
+      // on a phone the long fall down the left edge would run under the text: a garland along the top instead
+      if (phone) corner(H.x, H.y, 1, 1, [vw * .78, 92], T + .3, 0);
+      else corner(H.x, H.y, 1, 1, [Math.min(260, vw * .15), Math.min(760, vh * .8)], T + .3, 0);
       const vm = mask(2, R.x + R.w * .86, R.y + R.h + 22, R.x + R.w, R.y + R.h + 22 + R.w * .14);
       K.rect(R.x + R.w * .86, R.y + R.h + 22, R.w * .14, R.w * .14, VERM, T + 1.4, .2, { outline: false, mask: vm });
     }
@@ -600,7 +612,7 @@ function reel() {
   reelCur = cur;
   const line = $('.reeltext', pin), p = $('p', cur);
   line.classList.add('out');
-  setTimeout(() => { line.innerHTML = cur.classList.contains('text') ? '' : p ? p.innerHTML : ''; line.classList.remove('out'); }, 250);
+  setTimeout(() => { line.innerHTML = cur.classList.contains('words') ? '' : p ? p.innerHTML : ''; line.classList.remove('out'); }, 250);
   clearTimeout(reelTimer);
   reelTimer = setTimeout(() => playPlate(cur), 180);
 }
@@ -676,5 +688,5 @@ else {
   }));
   const insert = $('[data-insert]'); if (insert) mountMagi(insert, detail);
   if (location.hash.startsWith('#/')) open(location.hash.slice(2), false);
-  window.__site = { st, B, open, close };
+  window.__site = { st, B, page, draw, open, close };   // for devtools, and for capturing og.png
 }

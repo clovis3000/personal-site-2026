@@ -29,20 +29,42 @@ export function mountMagi(section, scroller) {
   let W = 0, H = 0, dpr = 1, p = 0, goal = 0, raf = 0, visible = false, L = null;
 
   function layout() {
-    const pad = 30, wl = W * .36, tw = Math.min(46, (wl - 3 * 12) / 4), th = tw * 1.3, gap = tw * .32;
-    const thumbs = Array.from({ length: 12 }, (_, i) => ({
-      stack: [pad + wl * .28 + i * 2.2, pad + 26 + i * 2.2],
-      grid: [pad + (i % 4) * (tw + gap), pad + 26 + Math.floor(i / 4) * (th + gap + 12)],
-    }));
-    const gy = pad + 26 + 3 * (th + gap + 12);
-    const big = { x: pad, y: gy + 72, w: wl * .86, h: H - gy - 72 - pad };
-    const lines = Array.from({ length: 16 }, (_, i) => ({ y: big.y + 20 + i * (big.h - 40) / 15, l: .45 + ((i * 37) % 11) / 11 * .5 }));
+    // portrait (a phone): the stages stack down the sheet, page above mesh above tables; landscape: the
+    // pages and the page read on the left, the mesh and the tables on the right
+    const port = W < 560, pad = port ? 16 : 30, fs = port ? 10.5 : 13;
+    let thumbs, gy, big, xr, g, mt, mb, mr, tiers;
+    if (port) {
+      const tw = Math.min(34, (W - 2 * pad - 5 * 8) / 6), th = tw * 1.3;
+      thumbs = Array.from({ length: 12 }, (_, i) => ({
+        stack: [W / 2 - tw / 2 + i * 2.2, pad + 20 + i * 2.2],
+        grid: [pad + (i % 6) * (tw + 8), pad + 20 + Math.floor(i / 6) * (th + 20)],
+      }));
+      gy = pad + 20 + 2 * (th + 20) + 4;
+      const bh = Math.min(170, H * .24);
+      big = { x: pad, y: gy + 60, w: Math.min(150, W * .44), h: bh };
+      tiers = [0, 1, 2].map(i => ({ x: pad, y: H - pad - 3 * 30 + i * 30, w: W - 2 * pad, h: 23 }));
+      xr = pad; mt = big.y + big.h + 34; mb = tiers[0].y - 22; mr = W - pad - 112;
+      g = Math.max(40, Math.min(64, (mr - xr) / 3.2));
+      L = { pad, fs, port, tw, th, thumbs, gy, big, xr, g, mt, mb, tiers };
+    } else {
+      const wl = W * .36, tw = Math.min(46, (wl - 3 * 12) / 4), th = tw * 1.3, gap = tw * .32;
+      thumbs = Array.from({ length: 12 }, (_, i) => ({
+        stack: [pad + wl * .28 + i * 2.2, pad + 26 + i * 2.2],
+        grid: [pad + (i % 4) * (tw + gap), pad + 26 + Math.floor(i / 4) * (th + gap + 12)],
+      }));
+      gy = pad + 26 + 3 * (th + gap + 12);
+      big = { x: pad, y: gy + 72, w: wl * .86, h: H - gy - 72 - pad };
+      xr = W * .44; g = Math.max(54, Math.min(96, (W - pad - xr) / 4.6));
+      tiers = [0, 1, 2].map(i => ({ x: xr, y: H - pad - 3 * 34 + i * 34, w: W - pad - xr, h: 26 }));
+      mt = pad + 40; mb = H * .62 + mt; mr = W - pad - 190;
+      L = { pad, fs, port, tw, th, thumbs, gy, big, xr, g, mt, mb: tiers[0].y - 18, tiers };
+    }
+    L.lines = Array.from({ length: 16 }, (_, i) => ({ y: big.y + (port ? 12 : 20) + i * (big.h - (port ? 24 : 40)) / 15, l: .45 + ((i * 37) % 11) / 11 * .5 }));
     // the mesh, on the trellis's diamond lattice
-    const xr = W * .44, g = Math.max(54, Math.min(96, (W - pad - xr) / 4.6)), pts = [];
-    for (let r = 0; r * g * .5 < H * .62; r++) for (let c = 0; xr + c * g * .5 + g * .25 < W - pad - 190; c++) if ((r + c) % 2 === 0) pts.push([xr + c * g * .5 + g * .25, pad + 40 + r * g * .5]);
-    const choose = [.06, .3, .55, .19, .44, .7, .85, .95].map(f => pts[Math.min(pts.length - 1, Math.floor(f * pts.length))]);
-    const tiers = [0, 1, 2].map(i => ({ x: xr, y: H - pad - 3 * 34 + i * 34, w: W - pad - xr, h: 26 }));
-    L = { pad, wl, tw, th, thumbs, gy, big, lines, xr, g, pts, nodes: choose, tiers };
+    const pts = [];
+    for (let r = 0; port ? mt + r * g * .5 <= mb : r * g * .5 < H * .62; r++) for (let c = 0; xr + c * g * .5 + g * .25 < mr; c++) if ((r + c) % 2 === 0) pts.push([xr + c * g * .5 + g * .25, mt + r * g * .5]);
+    L.pts = pts;
+    L.nodes = [.06, .3, .55, .19, .44, .7, .85, .95].map(f => pts[Math.min(pts.length - 1, Math.floor(f * pts.length))]);
   }
 
   // a cubic from a span's end to its entity, sampled; f draws only the first part of it
@@ -73,7 +95,7 @@ export function mountMagi(section, scroller) {
       x.fillStyle = C.panel; x.fillRect(px, py, L.tw, L.th);
       x.strokeStyle = C.lineStrong; x.strokeRect(px + .5, py + .5, L.tw - 1, L.th - 1);
       if (STATUS[i] !== 'e') { x.fillStyle = 'rgba(199, 207, 217, 0.22)'; for (let j = 0; j < 5; j++) x.fillRect(px + 6, py + 8 + j * (L.th - 16) / 5, (L.tw - 12) * (.55 + ((i + j) % 3) * .15), 1.5); }
-      text(HASH[i], px, py + L.th + 11, { size: 9, font: MONO, col: C.dim, alpha: cl(k * 2 - 1) });
+      text(HASH[i], px, py + L.th + 11, { size: L.port ? 8 : 9, font: MONO, col: C.dim, alpha: cl(k * 2 - 1) });
       // 2 · its score, once OCR has passed it
       const s = cl(e1 * 1.3 - i / 14);
       if (s > 0) {
@@ -83,8 +105,8 @@ export function mountMagi(section, scroller) {
         x.globalAlpha = 1;
       }
     });
-    text('9 clean   2 garbled   1 empty', L.pad, L.gy + 6, { alpha: e1 });
-    text('12 of 12 against the release index', L.pad, L.gy + 26, { col: C.dim, alpha: e4 });
+    text('9 clean   2 garbled   1 empty', L.pad, L.gy + 6, { size: L.fs, alpha: e1 });
+    text('12 of 12 against the release index', L.pad, L.gy + 24, { size: L.fs, col: C.dim, alpha: e4 });
 
     // 2 · one page, read: its lines brighten as the scan passes
     if (e1 > 0) {
@@ -94,7 +116,7 @@ export function mountMagi(section, scroller) {
         const scan = L.big.y + L.big.h * cl((e1 - .5) * 2.2);
         L.lines.forEach(({ y, l }) => { x.fillStyle = y < scan ? 'rgba(199, 207, 217, 0.55)' : 'rgba(199, 207, 217, 0.16)'; x.fillRect(L.big.x + 14, y - 1.5, (L.big.w - 28) * l, 3); });
         if (scan < L.big.y + L.big.h) { x.fillStyle = C.text; x.fillRect(L.big.x, scan, L.big.w, 1); }
-        text('page 14', L.big.x, L.big.y - 10, { col: C.dim, alpha: cl((e1 - .5) * 2) });
+        text('page 14', L.big.x, L.big.y - 10, { size: L.fs, col: C.dim, alpha: cl((e1 - .5) * 2) });
       }
     }
 
@@ -110,12 +132,12 @@ export function mountMagi(section, scroller) {
     // 4 · the mesh: the lattice faint, entities on it, threads from the spans, links between entities
     if (e3 > 0) {
       x.globalAlpha = e3; x.strokeStyle = C.lineDim;
-      const { xr, g } = L, top = L.pad + 40 - g * .25, bot = L.tiers[0].y - 18;
+      const { xr, g } = L, top = L.mt - g * .25, bot = L.mb;
       for (let c = -12; c < 30; c++) {
         x.beginPath(); x.moveTo(xr + c * g * .5, top); x.lineTo(xr + c * g * .5 + (bot - top), bot); x.stroke();
         x.beginPath(); x.moveTo(xr + c * g * .5, top); x.lineTo(xr + c * g * .5 - (bot - top), bot); x.stroke();
       }
-      x.save(); x.globalCompositeOperation = 'destination-out'; x.fillRect(0, 0, xr - 10, H); x.fillRect(W - L.pad, 0, L.pad, H); x.restore();
+      x.save(); x.globalCompositeOperation = 'destination-out'; x.fillRect(0, 0, xr - 10, H); x.fillRect(W - L.pad, 0, L.pad, H); if (L.port) x.fillRect(0, 0, W, top + g * .1); x.restore();
       x.globalAlpha = 1;
       x.strokeStyle = C.line;
       EDGE.forEach(([a, b], i) => { const f = cl(e3 * 1.5 - .3 - i * .05); if (f > 0) { const [ax, ay] = L.nodes[a], [bx, by] = L.nodes[b]; poly([[ax, ay], [lerp(ax, bx, f), lerp(ay, by, f)]]); } });
@@ -124,11 +146,12 @@ export function mountMagi(section, scroller) {
         const f = cl(e3 * 1.6 - .4 - i * .06); if (f <= 0) return;
         const hot = i === LINK[PICK];
         x.globalAlpha = f; x.fillStyle = hot ? C.amber : C.text; x.fillRect(nx - 3.5, ny - 3.5, 7, 7); x.globalAlpha = 1;
-        text(ENT[i], nx + 10, ny + 4.5, { col: hot ? C.text : C.dim, alpha: f });
+        text(ENT[i], nx + 10, ny + 4.5, { size: L.fs, col: hot ? C.text : C.dim, alpha: f });
       });
       // the claim, resolved: the amber entity cites its page and span
       const [hx, hy] = L.nodes[LINK[PICK]];
-      text('page 14 · characters 212 to 247', hx + 10, hy + 22, { col: C.amber, alpha: cl(e3 * 2 - 1.2) });
+      const claim = L.port ? 'page 14 · 212 to 247' : 'page 14 · characters 212 to 247';
+      text(claim, Math.min(hx + 10, W - L.pad - claim.length * L.fs * .52), hy + 20, { size: L.fs, col: C.amber, alpha: cl(e3 * 2 - 1.2) });
       // packets: they keep going once the mesh is up, slowly, amber on the followed thread
       if (e3 > .95) SPANS.forEach((_, k) => {
         const th = thread(k), u = (time * (k === PICK ? .16 : .1) + k * .37) % 1, [qx, qy] = th[Math.floor(u * (th.length - 1))];
@@ -141,13 +164,13 @@ export function mountMagi(section, scroller) {
       L.tiers.forEach((t, i) => {
         x.globalAlpha = cl(e4 * 1.6 - i * .2);
         x.strokeStyle = C.line; x.strokeRect(t.x + .5, t.y + .5, t.w - 1, t.h - 1);
-        text(['source', 'editors', 'readers'][i], t.x + 12, t.y + 17.5, { col: C.dim });
-        for (let j = 0; j < [6, 2, 1][i]; j++) { x.fillStyle = i ? 'rgba(199, 207, 217, 0.45)' : C.text; x.fillRect(t.x + 100 + j * 26, t.y + 10, 6, 6); }
+        text(['source', 'editors', 'readers'][i], t.x + 12, t.y + t.h * .67, { size: L.fs, col: C.dim });
+        for (let j = 0; j < [6, 2, 1][i]; j++) { x.fillStyle = i ? 'rgba(199, 207, 217, 0.45)' : C.text; x.fillRect(t.x + 100 + j * 26, t.y + t.h / 2 - 3, 6, 6); }
         x.globalAlpha = 1;
       });
       const r = L.tiers[2], s = L.tiers[1], f = cl(e4 * 1.5 - .5);
       if (f > 0) {
-        const sx = r.x + 103, y0 = r.y + 10, stop = s.y + s.h + 3;
+        const sx = r.x + 103, y0 = r.y + r.h / 2 - 3, stop = s.y + s.h + 3;
         x.strokeStyle = C.dim; x.setLineDash([3, 3]); poly([[sx, y0], [sx, lerp(y0, stop, f)]]); x.setLineDash([]);
         if (f >= 1) { x.strokeStyle = C.text; poly([[sx - 6, stop], [sx + 6, stop]]); }
       }
