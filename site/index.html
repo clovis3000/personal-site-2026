@@ -1,891 +1,233 @@
 <!doctype html>
 <html lang="en">
-<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Lewis Thompson — software for humans and agents</title>
-<meta name="description" content="Lewis Thompson builds software for humans and agents: pum, the period and symptom tracker built for endometriosis, and Project MAGI, coming soon.">
+<title>Lewis Thompson</title>
+<meta name="description" content="Lewis Thompson, product engineer: Pum, the period and symptom tracker built for endometriosis; Project MAGI, an instrument for the UAP disclosure record; and a seafaring map that predicts where Bronze Age harbours lie.">
 <link rel="canonical" href="https://lewisthompson.dev/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://lewisthompson.dev/">
 <meta property="og:title" content="Lewis Thompson">
-<meta property="og:description" content="Software for humans and agents.">
+<meta property="og:description" content="Product engineer. From the first sketch to production.">
 <meta property="og:image" content="https://lewisthompson.dev/og.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="theme-color" content="#F5EFE4">
+<meta name="theme-color" content="#ffffff">
 <meta name="color-scheme" content="light">
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
 <link rel="preload" href="fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="site.css">
 <script>document.documentElement.classList.add('js')</script>
-<style>
-@font-face{font-family:Archivo;src:url(fonts/archivo.woff2) format("woff2");font-weight:100 900;font-display:swap}
-@font-face{font-family:Newsreader;src:url(fonts/newsreader.woff2) format("woff2");font-weight:400;font-display:swap}
-@font-face{font-family:Newsreader;src:url(fonts/newsreader-italic.woff2) format("woff2");font-weight:400;font-style:italic;font-display:swap}
+<noscript><style>
+  html, body { overflow: auto; height: auto; }
+  #track { position: static; display: block; width: auto; height: auto; transform: none !important; }
+  .col { width: auto; height: auto; overflow: visible; }
+  #detail article[hidden] { display: block; }
+  .open, .back, .built, #rail, .band, .insert canvas { display: none; }
+  .insert, .pin, .reelpin { height: auto !important; }
+  .insert .sheet, .pin .stage, .reelstage { position: static; height: auto; }
+  .reel { position: static; flex-wrap: wrap; }
+</style></noscript>
 
-/* Inks. These are the only copies: the shader, the canvases and the SVG
-   figures read them at runtime through ink(). favicon.svg and og.png are
-   the exceptions, being files: regenerate them if a vertex ink moves.
-   The three vertex inks are the triangle's corners and the thesis
-   diagram's vertices, so they move together or not at all. */
-:root{
-  --paper:#F5EFE4;
-  --light:#FFFBF4;
-  --ink:#1B1714;
-  --ink-soft:#6B6158;
-  --logic:#6243BD;
-  --human:#E4548F;
-  --agent:#0FA595;
-  --cyan:#1CA3DC;
-  --night:#16120F;
-  --magi-page:#EDE3D3;
-  --magi-word:#A3968A;
-  --magi-red:#E8412A;
-  --magi-violet:#8565E6;
-  --magi-pale:#E9DCCB;
+<div id="gpu"></div>
 
-  --m:clamp(18px,4.2vw,72px);
-  --gut:clamp(16px,2.6vw,44px);
-  --sans:Archivo,"Helvetica Neue",Arial,sans-serif;
-  --serif:Newsreader,Georgia,"Times New Roman",serif;
-  --ease:cubic-bezier(.16,1,.3,1);
-  --bar:60px;
-  --bar-type:21px;
-}
-*{box-sizing:border-box}
-html{-webkit-text-size-adjust:100%;text-size-adjust:100%;scroll-behavior:smooth}
-body{margin:0;color:var(--ink);background:var(--paper);font:400 19px/1.56 var(--serif);font-optical-sizing:auto;-webkit-font-smoothing:antialiased;overflow-x:hidden}
-a{color:inherit}
-p{margin:0}
-::selection{background:var(--logic);color:var(--light)}
-:focus-visible{outline:2px solid var(--logic);outline-offset:3px}
-.arr{width:.62em;height:.62em;stroke:currentColor;stroke-width:1.6;fill:none;vertical-align:.04em;margin-left:.12em;overflow:visible}
+<div id="track">
+  <main class="col" id="index">
 
-/* ---------- bar ---------- */
-.bar{position:fixed;z-index:10;top:0;left:0;right:0;height:calc(var(--bar) + env(safe-area-inset-top));
-  padding:env(safe-area-inset-top) max(var(--m),env(safe-area-inset-right)) 0 max(var(--m),env(safe-area-inset-left));
-  display:flex;align-items:center;justify-content:space-between;gap:16px;
-  background:var(--paper);box-shadow:0 1px 0 rgba(27,23,20,.1);color:var(--ink);text-decoration:none;
-  transform:translateY(-101%);transition:transform .55s var(--ease)}
-.bar.on{transform:none}
-html:not(.js) .bar{display:none}
-.bar-name{font:900 var(--bar-type)/1 var(--sans);letter-spacing:-.03em;transform:translateY(.5em);opacity:0;transition:transform .7s var(--ease) .08s,opacity .5s ease .08s}
-.bar.on .bar-name{transform:none;opacity:1}
-.mark{position:relative;flex:0 0 auto;height:calc(var(--bar) * .52);aspect-ratio:1.1547}
-.mark canvas,.mark img{position:absolute;inset:0;width:100%;height:100%;display:block}
-.mark img{display:none}
-.mark.nogl img{display:block}
-.mark.nogl canvas{display:none}
-html{scroll-padding-top:var(--bar)}
-
-/* ---------- opening ---------- */
-.hero{
-  position:relative;min-height:100vh;min-height:100svh;
-  display:grid;column-gap:var(--gut);padding:var(--m);
-  grid-template-columns:minmax(0,4.8fr) minmax(0,7.2fr);
-  grid-template-rows:auto minmax(0,1fr) auto;
-  grid-template-areas:"intro art" ". art" "stance art";
-}
-.intro{grid-area:intro;container-type:inline-size}
-.name{margin:0 0 0 -.04em;font:900 18.4cqi/.84 var(--sans);letter-spacing:-.035em}
-.name span{display:block}
-.tag{margin-top:clamp(18px,3vh,32px);font:500 max(18px,4.7cqi)/1.2 var(--sans);letter-spacing:-.005em}
-.art{grid-area:art;position:relative;min-height:420px;container-type:size}
-.art canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.fb{display:none;position:absolute;bottom:0;left:50%;width:min(100cqw,115.47cqh);aspect-ratio:1.1547;transform:translateX(-50%);clip-path:polygon(50% 0,100% 100%,0 100%);
-  background:radial-gradient(circle at 50% 0,var(--logic),transparent 64%),radial-gradient(circle at 0 100%,var(--human),transparent 64%),radial-gradient(circle at 100% 100%,var(--agent),transparent 64%),var(--light)}
-html:not(.js) .fb,.art.nogl .fb{display:block}
-.art.nogl canvas{display:none}
-.stance{grid-area:stance;font:400 clamp(22px,1vw + 15px,34px)/1.24 var(--serif);letter-spacing:-.008em;max-width:17em;text-wrap:pretty}
-
-/* ---------- work ---------- */
-section,.back{position:relative;padding:clamp(80px,11vw,176px) var(--m) 0}
-.plates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:clamp(36px,4.4vw,72px)}
-.work{display:flex;flex-direction:column;min-width:0}
-.plate{position:relative;display:block;aspect-ratio:5/4;overflow:hidden;isolation:isolate}
-.pum .plate{background:var(--light)}
-.pum .plate canvas{position:absolute;inset:0;width:100%;height:100%;mix-blend-mode:multiply;transition:transform 1.6s var(--ease)}
-.magi .plate{background:var(--night)}
-.magi .plate svg{position:absolute;inset:0;width:100%;height:100%}
-.work-body{padding-top:26px;max-width:36em}
-.work h2{margin:0 0 12px;font:900 clamp(44px,5vw,80px)/.9 var(--sans);letter-spacing:-.035em}
-.work h2 a{text-decoration:none}
-.work h2 a:hover{text-decoration:underline;text-decoration-thickness:4px;text-underline-offset:6px}
-.work h2 .arr{width:.42em;height:.42em;stroke-width:1.9}
-.soon{font:italic 400 .36em/1 var(--serif);letter-spacing:0;color:var(--ink-soft);white-space:nowrap;margin-left:.3em}
-.deck{font:400 clamp(21px,1vw + 13px,26px)/1.25 var(--serif);margin-bottom:14px;text-wrap:balance}
-.facts{margin-top:18px;font:500 14px/1.4 var(--sans);color:var(--ink-soft)}
-.facts a{color:var(--ink);text-underline-offset:3px}
-
-/* ---------- thesis ---------- */
-.title{margin:0 0 clamp(40px,5vw,80px);font-weight:400;line-height:1;container-type:inline-size}
-.title .fit{display:block;width:max-content;font:500 100px/.8 var(--sans);letter-spacing:.04em;white-space:nowrap}
-/* fitTitle() sets exact sizes; these are the same fit from measured em-widths (5.996, 5.379), for a reader without JS */
-.title .l1{color:var(--logic);font-size:16.6cqi}
-.title .l3{color:var(--agent);font-size:18.5cqi}
-.title .spread{display:flex;align-items:center;gap:.7em;font:500 clamp(18px,2.6vw,40px)/1 var(--sans);margin:.3em 0 .32em;color:var(--logic)}
-.title .isa{letter-spacing:.62em;margin-right:-.62em}
-.title .ln{flex:1;height:2px;background:linear-gradient(90deg,var(--logic),var(--agent));margin-left:.4em}
-.thesis-body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:clamp(32px,5vw,96px);align-items:start}
-.thesis-text{max-width:34em}
-.thesis-text p+p{margin-top:.75em}
-.thesis-text .lead{font-size:clamp(22px,1vw + 14px,27px);line-height:1.3}
-.pull{margin:1.3em 0 0;padding:16px 0 0;border-top:2px solid var(--ink);font:italic 400 clamp(24px,1.4vw + 14px,34px)/1.18 var(--serif);text-wrap:balance}
-.diagram{margin:0}
-.diagram svg{display:block;width:100%;height:auto;overflow:visible}
-
-/* ---------- write ---------- */
-.write{margin:0;font:400 clamp(34px,4vw,64px)/1.08 var(--serif);letter-spacing:-.01em}
-.write a{text-decoration:none;font:800 .92em/1 var(--sans);letter-spacing:-.03em;border-bottom:.08em solid var(--logic)}
-.write a:hover{color:var(--logic)}
-.bands{position:relative;margin:clamp(56px,7vw,112px) calc(var(--m)*-1) 0;height:clamp(220px,30vw,440px);background:#4a6f6a}
-.bands canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
-.js .bands canvas{-webkit-mask-image:linear-gradient(100deg,#000 42%,transparent 58%);mask-image:linear-gradient(100deg,#000 42%,transparent 58%);-webkit-mask-size:260% 100%;mask-size:260% 100%;-webkit-mask-position:100% 0;mask-position:100% 0}
-.js .back.in .bands canvas{-webkit-mask-position:0 0;mask-position:0 0;transition:mask-position 2.4s cubic-bezier(.45,0,.2,1) .3s,-webkit-mask-position 2.4s cubic-bezier(.45,0,.2,1) .3s}
-.js .bands{background:transparent}
-.colophon{display:flex;justify-content:space-between;gap:8px 24px;padding:18px 0 28px;font:500 13px/1.4 var(--sans);color:var(--ink-soft)}
-.colophon a{text-decoration:none}
-.colophon a:hover{color:var(--ink)}
-
-/* ---------- motion ---------- */
-.js .hero .m-up{opacity:0;transform:translateY(.3em)}
-.js .hero.on .m-up{opacity:1;transform:none;transition:opacity .9s var(--ease),transform 1.1s var(--ease);transition-delay:var(--d,0s)}
-
-.js [data-reveal] .rv{opacity:0;transform:translateY(16px)}
-.js [data-reveal].in .rv{opacity:1;transform:none;transition:opacity .9s ease,transform 1.1s var(--ease);transition-delay:var(--d,0s)}
-
-/* pum: two inks arriving into (near) register */
-.js .pum .plate .ink-a{transform:translate(-14%,3%)}
-.js .pum .plate .ink-b{transform:translate(14%,-3%)}
-.js .pum.in .plate .ink-a,.js .pum.in .plate .ink-b{transform:none}
-.pum .plate:hover .ink-a{transform:translate(-1.6%,.6%)!important;transition-duration:.9s}
-.pum .plate:hover .ink-b{transform:translate(1.6%,-.6%)!important;transition-duration:.9s}
-
-/* MAGI: the page sets, the spans are marked, the threads find their entities */
-.mesh .ln,.mesh .sp,.mesh .en{transform-box:fill-box}
-.mesh .ln{transform-origin:left center}
-.js .mesh .ln{transform:scaleX(0)}
-.js .magi.in .mesh .ln{transform:none;transition:transform .7s var(--ease);transition-delay:var(--d)}
-.js .mesh .pg{opacity:0}
-.js .magi.in .mesh .pg{opacity:1;transition:opacity .6s ease}
-.js .mesh .sp{opacity:0}
-.js .magi.in .mesh .sp{opacity:1;transition:opacity .35s ease;transition-delay:var(--d)}
-.js .mesh .th{stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}
-.js .magi.in .mesh .th{stroke-dashoffset:0;transition:stroke-dashoffset 1s var(--ease);transition-delay:var(--d)}
-.mesh .en{transform-origin:center}
-.js .mesh .en{opacity:0;transform:scale(.4)}
-.js .magi.in .mesh .en{opacity:1;transform:none;transition:opacity .4s ease,transform .8s var(--ease);transition-delay:var(--d)}
-.mesh .caret{animation:caret 2.6s ease-in-out infinite;animation-play-state:paused;opacity:.25}
-.magi.live .mesh .caret{animation-play-state:running}
-@keyframes caret{0%,100%{opacity:.18}50%{opacity:1}}
-
-/* thesis diagram */
-.js .diagram .edge{stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}
-.js .in .diagram .edge{stroke-dashoffset:0;transition:stroke-dashoffset 1.3s var(--ease);transition-delay:var(--d,0s)}
-.js .diagram .vx{opacity:0;transform:scale(.6);transform-box:fill-box;transform-origin:center}
-.js .in .diagram .vx{opacity:1;transform:none;transition:opacity .6s ease,transform 1s var(--ease);transition-delay:var(--d,0s)}
-.js .diagram .lbl{opacity:0}
-.js .in .diagram .lbl{opacity:1;transition:opacity .8s ease;transition-delay:var(--d,1.2s)}
-
-@media (prefers-reduced-motion:reduce){
-  html{scroll-behavior:auto}
-  .js *{transition:none!important;animation:none!important}
-  .js .hero .m-up,.js [data-reveal] .rv,.js .mesh .pg,.js .mesh .sp,.js .mesh .en,.js .diagram .vx,.js .diagram .lbl{opacity:1!important;transform:none!important}
-  .js .mesh .ln,.js .pum .plate canvas{transform:none!important}
-  .js .mesh .th,.js .diagram .edge{stroke-dashoffset:0!important}
-  .js .bands canvas{-webkit-mask-image:none;mask-image:none}
-}
-
-/* ---------- narrow ---------- */
-@media (max-width:860px){
-  :root{--bar:54px;--bar-type:19px}
-  .hero{grid-template-columns:minmax(0,1fr);grid-template-rows:auto;grid-template-areas:"intro" "art" "stance";min-height:0;padding-bottom:0}
-  .art{aspect-ratio:1.1547;min-height:0;margin-top:clamp(36px,9vw,64px)}
-  .stance{max-width:none;margin-top:clamp(28px,7vw,48px)}
-  .plates{grid-template-columns:minmax(0,1fr)}
-  .thesis-body{grid-template-columns:minmax(0,1fr)}
-}
-@media (max-width:480px){
-  body{font-size:18px}
-}
-</style>
-</head>
-<body>
-
-<a class="bar" href="#top" aria-label="Lewis Thompson, back to the top" aria-hidden="true" inert>
-  <span class="bar-name">Lewis Thompson</span>
-  <span class="mark"><canvas></canvas><img src="favicon.svg" alt=""></span>
-</a>
-
-<header class="hero" id="top">
-  <div class="intro">
-    <h1 class="name"><span class="m-up" style="--d:.1s">Lewis</span><span class="m-up" style="--d:.18s">Thompson</span></h1>
-    <p class="tag m-up" style="--d:.34s">Software for humans and agents.</p>
-  </div>
-  <div class="art" aria-hidden="true"><canvas></canvas><div class="fb"></div></div>
-  <p class="stance m-up" style="--d:1s">Software must now interface with agents as well as it interfaces with humans, and each user group has their own needs. I build software from this thesis.</p>
-</header>
-
-<main>
-  <section class="works" id="works" aria-label="Work">
-    <div class="plates">
-      <article class="work pum" id="pum" data-reveal data-live>
-        <a class="plate" href="https://pum.me" aria-label="pum, at pum.me" tabindex="-1">
-          <canvas class="ink-a"></canvas>
-          <canvas class="ink-b"></canvas>
-        </a>
-        <div class="work-body">
-          <h2 class="rv" style="--d:.15s"><a href="https://pum.me">pum<svg class="arr" viewBox="0 0 10 10" aria-hidden="true"><path d="M1.5 8.5 8.5 1.5M3 1.5h5.5V7"/></svg></a></h2>
-          <p class="deck rv" style="--d:.25s">The period and symptom tracker built for endometriosis.</p>
-          <p class="rv" style="--d:.33s">Cycle and symptom tracking shaped around endometriosis rather than adapted to it. Private by design, to respect intimate data. The app is a context factory: a simple but powerful prompt export lets you discuss your symptoms with the AI assistant of your choosing, if you want to.</p>
-          <p class="facts rv" style="--d:.42s">iPhone · Free · No account · <a href="https://pum.me">pum.me</a></p>
+    <section class="hero" data-sec="hero">
+      <div class="text">
+        <h1 class="name">Lewis<br>Thompson</h1>
+        <p class="lede">Product engineer. I take software from the first sketch to production and keep it running.</p>
+        <div class="ways">
+          <button class="built" data-open="making">How this site was built</button>
+          <a class="cue" href="#pum">Portfolio</a>
         </div>
-      </article>
-
-      <article class="work magi" id="magi" data-reveal data-live>
-        <div class="plate" aria-hidden="true"><svg class="mesh" preserveAspectRatio="xMidYMid slice"></svg></div>
-        <div class="work-body">
-          <h2 class="rv" style="--d:.15s">Project MAGI<span class="soon">coming soon</span></h2>
-          <p class="deck rv" style="--d:.25s">An instrument for the UAP disclosure record.</p>
-          <p class="rv" style="--d:.33s">The US government’s UAP document releases, ingested whole and joined into one entity mesh, where every assertion resolves to a page and a span in the original. Hypothesis-agnostic, built for people to explore and for agents to query.</p>
-          <p class="facts rv" style="--d:.42s">Web · Rust · Postgres · In progress</p>
-        </div>
-      </article>
-    </div>
-  </section>
-
-  <section class="thesis" id="thesis" aria-labelledby="thesis-h" data-reveal data-live>
-    <h2 class="title" id="thesis-h" aria-label="Software is a triangle">
-      <span class="fit l1 rv" aria-hidden="true">SOFTWARE</span>
-      <span class="spread rv" aria-hidden="true" style="--d:.12s"><span class="isa">IS A</span><span class="ln"></span></span>
-      <span class="fit l3 rv" aria-hidden="true" style="--d:.22s">TRIANGLE</span>
-    </h2>
-
-    <div class="thesis-body">
-      <div class="thesis-text">
-        <p class="lead rv" style="--d:.3s">Software in the post-AI era has three vertices: the business logic, the human, and the agent.</p>
-        <p class="rv" style="--d:.38s">Interaction and representation occur at the edges, the interfaces, and every edge runs both ways. Synthesis occurs at the vertices. The agent vertex is a crucible: it reads what the logic produces, holds what it knows of the person, and pattern-matches the two into something neither could produce alone.</p>
-        <p class="rv" style="--d:.46s">An application becomes a context factory. It captures, structures and exports precise data about its domain, and hands it to the assistant the user already trusts. Without the agent it’s still a good tool. With it, it becomes something much larger.</p>
-        <p class="pull rv" style="--d:.56s">Most software still builds one edge and calls it finished.</p>
       </div>
-      <figure class="diagram rv" style="--d:.2s">
-        <svg viewBox="0 0 640 560" role="img" aria-labelledby="dg-t"><title id="dg-t">A triangle: logic, human and agent at the vertices. Each edge is a pair of arrows running both ways: GUI between logic and human, CLI, API and MCP between logic and agent, chat between human and agent.</title></svg>
-      </figure>
-    </div>
-  </section>
-</main>
+      <div class="art"><div class="plane square" data-plane="square" data-tint="#2340b8" data-pattern="morris"></div></div>
+    </section>
 
-<footer class="back" id="contact" data-reveal>
-  <h2 class="write rv">Write to me<br><a href="mailto:lewispthompson.software@proton.me">lewispthompson.<wbr>software<wbr>@proton.me</a></h2>
-  <div class="bands" aria-hidden="true"><canvas></canvas></div>
-  <p class="colophon"><span>© <span data-year>2026</span> Lewis Thompson</span><a href="#top">Top ↑</a></p>
-</footer>
+    <div class="cloud r" data-cloud></div>
 
-<script>
-(() => {
-'use strict';
-const $ = (s, r = document) => r.querySelector(s);
-const $$ = (s, r = document) => [...r.querySelectorAll(s)];
-const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
-const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
-const easeOut = t => 1 - Math.pow(1 - clamp(t, 0, 1), 4);
-const lerp = (a, b, t) => a + (b - a) * t;
-const rootStyle = getComputedStyle(document.documentElement);
-const ink = n => rootStyle.getPropertyValue('--' + n).trim();
-const rgb = n => { const h = ink(n).replace('#', ''); return [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16) / 255); };
-function rng(seed) { // mulberry32
-  return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed);
-    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
-}
-$$('[data-year]').forEach(n => n.textContent = new Date().getFullYear());
+    <section data-sec="pum" id="pum">
+      <div class="text">
+        <div class="mon" data-mon="jelly"></div>
+        <h2>Pum</h2>
+        <p class="lede">A period and symptom tracker built for endometriosis, for iPhone. Free, no account, and the data stays on her phone.</p>
+        <dl class="facts">
+          <dt>Shipped</dt><dd>20 July 2026, after a solo build from July 2025; 45 tagged releases since</dd>
+          <dt>Built</dt><dd>184,000 lines of Swift over a 78,000-line Rust engine, through UniFFI</dd>
+          <dt>Insight</dt><dd>n-of-1 models: each person compared with herself, gated by an eval harness</dd>
+          <dt>Found</dt><dd>#4 in US App Store search for “endometriosis tracker”</dd>
+        </dl>
+        <button class="open" data-open="pum">Read about Pum</button>
+      </div>
+      <div class="art"><div class="plane circle" data-plane="circle" data-tint="#b8325a" data-pattern="morris"></div></div>
+    </section>
 
-/* ---- a loop that runs only while something is on screen and moving ---- */
-const actors = new Set();
-let looping = false;
-function wake() { if (!looping && !document.hidden) { looping = true; requestAnimationFrame(tick); } }
-function tick(t) {
-  let more = false;
-  for (const a of actors) if (a.visible && a.step(t)) more = true;
-  if (more && !document.hidden) requestAnimationFrame(tick); else looping = false;
-}
-document.addEventListener('visibilitychange', () => { if (!document.hidden) wake(); });
-const seen = new IntersectionObserver(es => {
-  for (const e of es) { const a = e.target._actor; if (a) { a.visible = e.isIntersecting; } e.target.classList.toggle('live', e.isIntersecting); }
-  wake();
-}, { rootMargin: '80px' });
-function actor(el, step) { const a = { visible: false, step }; el._actor = a; actors.add(a); seen.observe(el); return a; }
+    <div class="cloud" data-cloud></div>
 
-/* =========================================================
-   The triangle. GPU rendering begins with one triangle and a
-   colour at each corner, blended across the face; this is
-   that triangle, airbrushed. A crisp frisket, three inks
-   sprayed in from the corners (logic, human, agent), and a
-   core left as bare, lit paper. Each pixel takes ink or not
-   by a random threshold on the spray's density, which is
-   what airbrush droplets look like, so building the density
-   literally sprays it on.
+    <section class="flip" data-sec="magi" id="magi">
+      <div class="text">
+        <div class="mon" data-mon="delta"></div>
+        <h2>Project MAGI</h2>
+        <p class="lede">An instrument for the UAP disclosure record. It joins the government’s releases into one mesh where every assertion resolves to a page and a span in the original.</p>
+        <dl class="facts">
+          <dt>Record</dt><dd>290 documents and 8,900 pages from seven collections, of roughly 116,000</dd>
+          <dt>Built</dt><dd>32,000 lines of Rust and 15,000 of TypeScript since May 2026</dd>
+          <dt>Pipeline</dt><dd>OCR, entities, embeddings; every page scored clean, garbled or empty</dd>
+          <dt>Agents</dt><dd>A read-only JSON API over search, entities, the map and the timeline</dd>
+        </dl>
+        <button class="open" data-open="magi">Read about MAGI</button>
+      </div>
+      <div class="art"><div class="plane square" data-plane="square" data-tint="#1f3a8f" data-pattern="trellis"></div></div>
+    </section>
 
-   Once it has landed, the corners pour into each other like
-   three slow streams of sand. Each ink has its own field of
-   grains, and each field drifts steadily away from its corner,
-   so violet sifts down from the apex while pink and teal rise
-   from the base. A grain thins out as it travels into its
-   neighbour's colour, and where two inks meet, two currents
-   pass through one another.
-   ========================================================= */
-const TRI_FS = `precision highp float;
-uniform vec2 uRes;uniform float uDpr;uniform vec2 uV[3];uniform vec3 uInk[3];uniform vec3 uPaper,uLight;
-uniform vec3 uLo,uReach;uniform float uSpan,uGlow,uT,uStoch;uniform vec2 uFlow[3];
-float h12(vec2 p){vec3 p3=fract(vec3(p.xyx)*.1031);p3+=dot(p3,p3.yzx+33.33);return fract((p3.x+p3.y)*p3.z);}
-float vn(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);
-  return mix(mix(h12(i),h12(i+vec2(1,0)),f.x),mix(h12(i+vec2(0,1)),h12(i+vec2(1,1)),f.x),f.y);}
-// grain: a per-device-pixel random value, tiled every 1024 px so the drift can
-// wrap without a seam (mediump-safe), with a little 2 px clumping
-float grain(vec2 x){x=floor(x);
-  return mix(h12(mod(x,1024.)),h12(mod(floor(x*.5),512.)+71.3),.35);}
-float sdTri(vec2 p,vec2 p0,vec2 p1,vec2 p2){
-  vec2 e0=p1-p0,e1=p2-p1,e2=p0-p2,v0=p-p0,v1=p-p1,v2=p-p2;
-  vec2 q0=v0-e0*clamp(dot(v0,e0)/dot(e0,e0),0.,1.),q1=v1-e1*clamp(dot(v1,e1)/dot(e1,e1),0.,1.),q2=v2-e2*clamp(dot(v2,e2)/dot(e2,e2),0.,1.);
-  float s=sign(e0.x*e2.y-e0.y*e2.x);
-  vec2 d=min(min(vec2(dot(q0,q0),s*(v0.x*e0.y-v0.y*e0.x)),vec2(dot(q1,q1),s*(v1.x*e1.y-v1.y*e1.x))),vec2(dot(q2,q2),s*(v2.x*e2.y-v2.y*e2.x)));
-  return -sqrt(d.x)*sign(d.y);}
-vec3 bary(vec2 p,vec2 a,vec2 b,vec2 c){
-  vec2 v0=b-a,v1=c-a,v2=p-a;float d00=dot(v0,v0),d01=dot(v0,v1),d11=dot(v1,v1),d20=dot(v2,v0),d21=dot(v2,v1);
-  float den=d00*d11-d01*d01,v=(d11*d20-d01*d21)/den,w=(d00*d21-d01*d20)/den;return vec3(1.-v-w,v,w);}
-void main(){
-  vec2 fc=gl_FragCoord.xy;
-  vec2 p=vec2(fc.x,uRes.y*uDpr-fc.y)/uDpr;
-  float sd=sdTri(p,uV[0],uV[1],uV[2]);
-  float cov=clamp(.5-sd*uDpr,0.,1.);
-  if(cov<=0.){gl_FragColor=vec4(uPaper,1.);return;}
-  float side=length(uV[2]-uV[1]);
-  vec2 q=p/side;
-  float m=vn(q*3.+vec2(uT*.012,-uT*.009))*.6+vn(q*9.-vec2(uT*.016,uT*.006))*.4;
-  vec3 b=clamp(bary(p,uV[0],uV[1],uV[2]),0.,1.);
-  // the spray front is never geometric: a slow noise in each corner's reach
-  b+=(vec3(vn(q*3.4+vec2(1.7,uT*.011)),vn(q*3.4+vec2(5.3,-uT*.009)),vn(q*3.4+vec2(uT*.008,9.1)))-.5)*.07;
-  vec3 f=smoothstep(uLo,uLo+uSpan,b);
-  // while it builds, each corner's spray blooms outward from its vertex
-  vec3 dv=vec3(length(p-uV[0]),length(p-uV[1]),length(p-uV[2]))/side;
-  f*=smoothstep(uReach,uReach-.38,dv+(m-.5)*.12);
-  float S=f.x+f.y+f.z;
-  float D=clamp(S,0.,1.)*(.86+.14*m);
-  vec3 w=f/max(S,1e-4);
-  vec3 base=mix(uPaper,uLight,uGlow);
-  vec3 even=mix(base,w.x*uInk[0]+w.y*uInk[1]+w.z*uInk[2],D);
-  // three drifting grain fields, one per ink. The pixel takes ink 0 if its
-  // grain lands, else ink 1, else ink 2, each threshold conditioned on the
-  // ones before, so each ink still covers exactly D*w of the face
-  vec3 c=D*w;
-  vec3 drop=base;
-  if(grain(fc-uFlow[0])<c.x)drop=uInk[0];
-  else if(grain(fc-uFlow[1]+vec2(331.,97.))*(1.-c.x)<c.y)drop=uInk[1];
-  else if(grain(fc-uFlow[2]+vec2(613.,449.))*(1.-c.x-c.y)<c.z)drop=uInk[2];
-  gl_FragColor=vec4(mix(uPaper,mix(even,drop,uStoch),cov),1.);
-}`;
+    <div class="cloud r" data-cloud></div>
 
-// One sprayed triangle on one canvas: equilateral, standing on the bottom of
-// its box, as wide as the box allows. The hero and the logomark each own one.
-// The hero caps at DPR 2 for the GPU's sake; the mark is tiny enough to render
-// at full density, so a 3x phone never sees its droplets resampled.
-function sprayer(cv, maxDpr = 2) {
-  const gl = cv.getContext('webgl', { antialias: false, alpha: false, powerPreference: 'low-power' });
-  if (!gl) return null;
-  const sh = (type, src) => { const s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error(gl.getShaderInfoLog(s)); return s; };
-  const prog = gl.createProgram();
-  gl.attachShader(prog, sh(gl.VERTEX_SHADER, 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}'));
-  gl.attachShader(prog, sh(gl.FRAGMENT_SHADER, TRI_FS));
-  gl.linkProgram(prog);
-  if (!gl.getProgramParameter(prog, gl.LINK_STATUS)) throw new Error(gl.getProgramInfoLog(prog));
-  gl.useProgram(prog);
-  const buf = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, buf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 3, -1, -1, 3]), gl.STATIC_DRAW);
-  const loc = gl.getAttribLocation(prog, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = n => gl.getUniformLocation(prog, n);
-  const u = { res: U('uRes'), dpr: U('uDpr'), v: U('uV'), lo: U('uLo'), reach: U('uReach'), span: U('uSpan'), glow: U('uGlow'),
-              t: U('uT'), stoch: U('uStoch'), flow: U('uFlow') };
-  gl.uniform3fv(U('uInk'), [...rgb('logic'), ...rgb('human'), ...rgb('agent')]);
-  gl.uniform3fv(U('uPaper'), rgb('paper')); gl.uniform3fv(U('uLight'), rgb('light'));
-  const s = { W: 1, H: 1, dpr: 1, V: [[0, 0], [0, 0], [0, 0]], side: 1, dirs: [] };
-  s.layout = () => {
-    const r = cv.getBoundingClientRect();
-    s.W = Math.max(1, r.width); s.H = Math.max(1, r.height);
-    s.dpr = Math.min(maxDpr, window.devicePixelRatio || 1);
-    cv.width = Math.round(s.W * s.dpr); cv.height = Math.round(s.H * s.dpr);
-    gl.viewport(0, 0, cv.width, cv.height);
-    const side = s.side = Math.min(s.W, s.H / 0.8660254), h = side * 0.8660254, x0 = (s.W - side) / 2;
-    const V = s.V = [[x0 + side / 2, s.H - h], [x0, s.H], [x0 + side, s.H]];
-    // each ink's grains pour from its corner toward the centre, in device
-    // pixels with y up (the grain lives in gl_FragCoord space)
-    const C = [(V[0][0] + V[1][0] + V[2][0]) / 3, (V[0][1] + V[1][1] + V[2][1]) / 3];
-    s.dirs = V.map(([x, y]) => { const dx = C[0] - x, dy = C[1] - y, L = Math.hypot(dx, dy); return [dx / L, -dy / L]; });
-  };
-  const flow = new Float32Array(6);
-  // f: { t, lo[3], reach[3], glow, span, stoch, pour (css px of drift so far) }
-  s.draw = f => {
-    // the drift wraps at the grain's 1024 px tile, so it never loses precision
-    s.dirs.forEach(([dx, dy], i) => { const d = f.pour * s.dpr; flow[i * 2] = (dx * d) % 1024; flow[i * 2 + 1] = (dy * d) % 1024; });
-    gl.uniform2f(u.res, s.W, s.H); gl.uniform1f(u.dpr, s.dpr); gl.uniform2fv(u.v, s.V.flat());
-    gl.uniform3fv(u.lo, f.lo); gl.uniform3fv(u.reach, f.reach); gl.uniform1f(u.span, f.span);
-    gl.uniform1f(u.glow, f.glow); gl.uniform1f(u.t, f.t); gl.uniform1f(u.stoch, f.stoch);
-    gl.uniform2fv(u.flow, flow);
-    gl.drawArrays(gl.TRIANGLES, 0, 3);
-  };
-  s.gl = gl;
-  return s;
-}
+    <section data-sec="sea" id="sea">
+      <div class="text">
+        <div class="mon" data-mon="rose"></div>
+        <h2>Seafaring map</h2>
+        <p class="lede">Can free wind and ocean data predict where Bronze Age harbours still lie buried? A treasure hunt across the Arabian Sea.</p>
+        <dl class="facts">
+          <dt>Model</dt><dd>Seasonal drift and sailing from ERA5 winds and GLORYS currents, over 499 stretches of ancient coast</dd>
+          <dt>Sealed</dt><dd>Pre-registered, reviewed in four adversarial rounds, sealed to a commit hash</dd>
+          <dt>Look 1</dt><dd>p = 0.186 against 0.02: recorded as uninformative, as the rules said</dd>
+        </dl>
+        <button class="open" data-open="sea">Read about the map</button>
+      </div>
+      <div class="art"><div class="plane half" data-plane="half" data-tint="#0f7f7a" data-pattern="waves"></div></div>
+    </section>
 
-function triangle() {
-  const art = $('.art'), cv = $('canvas', art);
-  const T = sprayer(cv);
-  if (!T) { art.classList.add('nogl'); return; }
 
-  // the reader is a fourth presence: the corner nearest the pointer reaches a
-  // little further into the face, on a critically damped spring
-  let tx = 0, ty = 0, tp = 0, px = 0, py = 0, pp = 0, vx = 0, vy = 0, vp = 0;
-  const hero = $('.hero');
-  hero.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse') return;
-    const r = art.getBoundingClientRect(); tx = e.clientX - r.left; ty = e.clientY - r.top; tp = 1; wake();
-  });
-  hero.addEventListener('pointerleave', () => { tp = 0; wake(); });
+    <section class="write" data-sec="write" id="write">
+      <div class="text">
+        <h2>Write to me</h2>
+        <p class="lede"><a href="mailto:lewispthompson.software@proton.me">lewispthompson.software@proton.me</a></p>
+        <p class="aside"><a href="https://lewisthompson.dev/lewis-thompson-resume.pdf">Résumé</a></p>
+        <button class="open" data-open="making">How this site was built</button>
+      </div>
+      <div class="art"><div class="plane half" data-plane="arch" data-tint="#2340b8"></div></div>
+    </section>
+  </main>
 
-  // The pour: grains drift at POUR css px a second once the spray has landed,
-  // easing up from still over a couple of seconds so the build stays a build.
-  const POUR = 9, POUR0 = 2.2, POUR_EASE = 2.5;
-  const pour = t => reduced ? 0 : POUR * (t < POUR0 ? 0 : t - POUR0 < POUR_EASE ? (t - POUR0) ** 2 / (2 * POUR_EASE) : t - POUR0 - POUR_EASE / 2);
+  <div class="col" id="detail">
 
-  // the entrance clock starts on the first frame the page is actually seen,
-  // so a link opened in a background tab still sprays when it's looked at
-  let t0 = null; const LO = 0.26, SPAN = 0.64, BUILD = 2400;
-  let last = -1e9, lastT = performance.now();
-  function draw(now) {
-    if (t0 === null && !document.hidden) t0 = now + 120;
-    const t = Math.max(0, (now - (t0 === null ? now : t0)) / 1000);
-    const reach = [];
-    const lo = [0, 1, 2].map(i => {
-      // logic first, then the human, then the agent
-      const e = reduced ? 1 : easeOut((t - 0.3 - i * 0.32) / 1.5);
-      reach.push(lerp(0, 1.8, e));
-      const breathe = 0.016 * Math.sin(t * 0.23 + i * 2.1) + 0.008 * Math.sin(t * 0.097 + i * 4.3);
-      const d = Math.hypot(px - T.V[i][0], py - T.V[i][1]) / T.side;
-      const lean = 0.045 * pp * Math.exp(-d * d * 2.4);
-      return lerp(0.7, LO, e) + (breathe - lean) * e;
-    });
-    T.draw({ t, lo, reach, span: SPAN, glow: reduced ? 1 : easeOut(t / 0.9), stoch: 0.8, pour: pour(t) });
-  }
-  T.layout();
-  const a = actor(art, now => {
-    const dt = Math.min(0.05, (now - lastT) / 1000); lastT = now;
-    const K = 14, D = 2 * Math.sqrt(K);
-    vx += (K * (tx - px) - D * vx) * dt; vy += (K * (ty - py) - D * vy) * dt; vp += (K * (tp - pp) - D * vp) * dt;
-    px += vx * dt; py += vy * dt; pp += vp * dt;
-    const moving = (Math.abs(vx) + Math.abs(vy)) / T.side + Math.abs(vp) + Math.abs(tp - pp) > 0.002;
-    const building = t0 === null || now - t0 < BUILD + 100;
-    if (reduced) { if (last < 0) { draw(now); last = now; } return false; }
-    // after the build, 24 fps keeps a drift of ~9 px/s moving as sand, not steps
-    if (building || moving || now - last > 41) { draw(now); last = now; }
-    return true;
-  });
-  new ResizeObserver(() => { T.layout(); last = -1e9; draw(performance.now()); }).observe(art);
-  cv.addEventListener('webglcontextlost', e => { e.preventDefault(); actors.delete(a); art.classList.add('nogl'); });
-  a.visible = true; draw(performance.now()); wake();
-}
+    <article data-p="pum" hidden>
+      <div class="band" data-band data-tint="#b8325a" data-pattern="morris"></div>
+      <div class="body">
+        <div class="mon lg" data-mon="jelly"></div>
+        <h1>Pum</h1>
+        <a class="visit" href="https://pum.me">pum.me</a>
+        <p class="lede">A period and symptom tracker built for endometriosis, for iPhone. Free, no account, and the data stays on her phone.</p>
+        <p>Pum is a SwiftUI app over a Rust engine compiled to a static library, with UniFFI-generated Swift bindings. The engine holds cycle detection, the insight models and the hypothesis ledger, so the same code runs in the app, in a macOS test harness and in a simulation CLI.</p>
+        <p>Its insights are n-of-1 models over her own history: whether poor sleep precedes pain days for her, say, using a case-crossover estimator, so each person is compared with herself rather than with a population average. An eval harness gates them. A candidate model must show more statistical power than its baseline on simulated data, at a false-positive rate no higher than 5%, before it replaces it.</p>
+        <p>Pum calls no LLM. Instead she can export everything, or chosen sections, ready to paste into an assistant, and the export says what it includes, what she left out, and what she hasn’t logged, so the assistant doesn’t mistake missing data for absent symptoms.</p>
+        <p>I run its production alone: Rust services with Postgres behind nginx and systemd, serving the marketing site, an admin dashboard, a crash collector and the end-to-end encrypted sync server for Pum Circle.</p>
+      </div>
+      <button class="back end" data-back>All work</button>
+    </article>
 
-/* =========================================================
-   The bar: once the name has scrolled away it waits at the
-   top, with the triangle as a logomark. The mark is the same
-   shader, quieter: it sprays in once, then pours at a third of
-   the hero's pace.
-   ========================================================= */
-function bar() {
-  const el = $('.bar'), name = $('.name'), mark = $('.mark', el);
-  let shown = false, M = null, mt0 = null, last = -1e9;
-  function show(on) {
-    if (on === shown) return;
-    shown = on; el.classList.toggle('on', on);
-    el.toggleAttribute('inert', !on); el.setAttribute('aria-hidden', String(!on));
-    if (on && M) { if (mt0 === null) mt0 = performance.now(); wake(); }
-  }
-  const io = new IntersectionObserver(([e]) => show(!e.isIntersecting && e.boundingClientRect.top < 0),
-    { rootMargin: `-${el.offsetHeight || 56}px 0px 0px 0px` });
-  io.observe(name);
-  try { M = sprayer($('canvas', mark), 3); } catch (e) { console.warn(e); M = null; }
-  if (!M) { mark.classList.add('nogl'); return; }
-  M.layout();
-  const LO = 0.13;
-  function draw(now) {
-    const t = mt0 === null ? 0 : (now - mt0) / 1000;
-    const e = reduced ? 1 : easeOut(t / 0.9);
-    const lo = [0, 1, 2].map(() => lerp(0.7, LO, e));
-    M.draw({ t, lo, reach: [0, 1, 2].map(() => lerp(0, 1.8, e)), span: 0.55, glow: e, stoch: 0.3, pour: reduced ? 0 : 3 * t });
-  }
-  const a = actor(mark, now => {
-    if (!shown) return false;
-    if (reduced) { if (last < 0) { draw(now); last = now; } return false; }
-    // the mark is small and slow: ten frames a second, full rate while it sprays in
-    if (now - mt0 < 1000 || now - last > 100) { draw(now); last = now; }
-    return true;
-  });
-  new ResizeObserver(() => { M.layout(); draw(performance.now()); }).observe(mark);
-  $('canvas', mark).addEventListener('webglcontextlost', e => { e.preventDefault(); actors.delete(a); mark.classList.add('nogl'); });
-  draw(performance.now());
-}
+    <article data-p="magi" hidden>
+      <div class="band" data-band data-tint="#1f3a8f" data-pattern="trellis"></div>
+      <div class="body">
+        <div class="mon lg" data-mon="delta"></div>
+        <h1>Project MAGI</h1>
+        <a class="visit" href="https://projectmagi.app">projectmagi.app</a>
+        <p class="lede">The government’s UAP releases arrive as bulk ZIPs and page-at-a-time viewers. MAGI ingests them, extracts entities, and joins everything into one mesh where every assertion resolves to a page and a span in the original. It takes no position on what UAPs are.</p>
+        <p>The pipeline runs OCR, then named-entity extraction, then embeddings, on rented GPUs. Each page gets a quality score, clean, garbled or empty, so bad OCR is counted rather than hidden. Original files live on disk addressed by hash; Postgres holds the text, entities and pgvector embeddings.</p>
+        <p>Corpus-extracted data, editorial data and user data are separate provenance tiers that never share a table, so a user’s theory can never sit beside an entity extracted from a government document.</p>
+        <p>Its rules came from real mistakes. Don’t store a value more precisely than its source states it. Don’t let a parser fall back to a coarser reading when it fails: return nothing and count it. Don’t present filing density as incident density. The record measures the paperwork, not the phenomenon.</p>
+      </div>
+      <section class="insert" data-insert data-demo>
+        <div class="sheet">
+          <div class="copy">
+            <h3>Every claim back to its page</h3>
+            <ol class="steps">
+              <li>The record arrives as bulk archives and page viewers. MAGI fetches every release and files each document under its own hash.</li>
+              <li>OCR reads each page and scores it clean or garbled or empty. Bad pages are counted so nothing is hidden.</li>
+              <li>Entities are pulled from the text. People and places and agencies and dates.</li>
+              <li>They join one mesh. Every claim in it resolves to a page and a span in the original.</li>
+              <li>Source text and editors’ notes and readers’ theories never share a table. Coverage is checked against each release’s own index.</li>
+            </ol>
+            <p class="goal">The aim is a record anyone can check. It takes no position on what UAPs are.</p>
+          </div>
+          <canvas class="diagram" aria-hidden="true"></canvas>
+        </div>
+      </section>
+      <button class="back end" data-back>All work</button>
+    </article>
 
-/* =========================================================
-   pum as a jellyfish (pum's own emblem), drawn twice: hot
-   pink and cyan, each a filled bell knocked out with tangled
-   white lines, offset like two plates that never quite agree.
-   ========================================================= */
-function jellyfish() {
-  const art = $('.pum'); if (!art) return;
-  const plate = $('.plate', art);
-  const inks = [{ el: $('.ink-a', art), color: ink('human'), seed: 7, off: [-0.035, 0.012] },
-                { el: $('.ink-b', art), color: ink('cyan'), seed: 23, off: [0.035, -0.01] }];
-  function make(seed) {
-    const R = rng(seed);
-    const loops = [];
-    for (let k = 0; k < 17; k++) {
-      const s = 0.14 + 0.86 * (k / 16) + (R() - 0.5) * 0.05;
-      loops.push({ s, a: R() * 6.28, b: R() * 6.28, w1: 0.05 + R() * 0.07, w2: 0.03 + R() * 0.05, oy: (R() - 0.5) * 0.08 });
-    }
-    const walks = [];
-    for (let k = 0; k < 9; k++) {
-      let x = (R() - 0.5) * 1.2, y = -0.15 - R() * 0.5, h = R() * 6.28; const pts = [];
-      for (let i = 0; i < 170; i++) {
-        h += (R() - 0.5) * 0.55 + Math.sin(i * 0.11 + k) * 0.08;
-        x += Math.cos(h) * 0.022; y += Math.sin(h) * 0.022;
-        const ex = x, ey = (y + 0.02) / 0.8; if (ex * ex + ey * ey > 0.9 || y > 0.02) { h += Math.PI * 0.7; x *= 0.96; y = Math.min(y, 0); }
-        pts.push([x, y]);
-      }
-      walks.push(pts);
-    }
-    const blocks = [];
-    for (let k = 0; k < 26; k++) {
-      const a = Math.PI + (k + 0.3 + R() * 0.4) / 26 * Math.PI;
-      blocks.push({ a, len: 0.05 + R() * 0.07, gap: 0.04 + R() * 0.05, w: 0.05 + R() * 0.03 });
-    }
-    const tent = [];
-    for (let k = 0; k < 15; k++) tent.push({ x: -0.92 + 1.84 * (k + R() * 0.6) / 15, len: 1.5 + R() * 0.75, ph: R() * 6.28, amp: 0.05 + R() * 0.06, curl: (R() - 0.5) * 0.5 });
-    const arms = [];
-    for (let k = 0; k < 4; k++) arms.push({ x: -0.28 + k * 0.19 + (R() - 0.5) * 0.05, len: 1.05 + R() * 0.45, ph: R() * 6.28, w: 0.06 + R() * 0.04 });
-    return { loops, walks, blocks, tent, arms };
-  }
-  inks.forEach(k => { k.geo = make(k.seed); k.ctx = k.el.getContext('2d'); });
-  let W = 0, H = 0, dpr = 1;
-  function size() {
-    const r = plate.getBoundingClientRect(); W = r.width; H = r.height; dpr = Math.min(2, devicePixelRatio || 1);
-    inks.forEach(k => { k.el.width = Math.round(W * dpr); k.el.height = Math.round(H * dpr); });
-  }
-  function bellPath(c, sx, sy) {
-    c.beginPath();
-    c.ellipse(0, 0, sx, 0.8 * sy, 0, Math.PI, 0);
-    const n = 9;
-    for (let j = 0; j < n; j++) {
-      const x0 = sx * (1 - 2 * j / n), x1 = sx * (1 - 2 * (j + 1) / n);
-      c.quadraticCurveTo((x0 + x1) / 2, 0.13 * sy, x1, 0.02 * sy);
-    }
-    c.closePath();
-  }
-  function drawInk(k, t) {
-    const c = k.ctx, g = k.geo;
-    const R = Math.min(W * 0.25, H * 0.32);
-    c.setTransform(dpr, 0, 0, dpr, 0, 0); c.clearRect(0, 0, W, H);
-    c.translate(W * (0.5 + k.off[0]), H * (0.41 + k.off[1]));
-    const pulse = Math.sin(t * 1.15);
-    const sx = R * (1 + 0.018 * pulse), sy = R * (1 - 0.03 * pulse);
-    c.fillStyle = k.color; c.strokeStyle = k.color;
-    // rim blocks, like the shell of segments around a globe
-    c.lineCap = 'butt';
-    for (const b of g.blocks) {
-      const r0 = 1.04 + b.gap, ca = Math.cos(b.a), sa = Math.sin(b.a);
-      c.lineWidth = b.w * R;
-      c.beginPath(); c.moveTo(ca * sx * r0, sa * 0.8 * sy * r0); c.lineTo(ca * sx * (r0 + b.len), sa * 0.8 * sy * (r0 + b.len)); c.stroke();
-    }
-    // bell
-    bellPath(c, sx, sy); c.fill();
-    c.save(); bellPath(c, sx, sy); c.clip();
-    c.strokeStyle = '#fff'; c.lineWidth = 1.15; c.lineJoin = 'round';
-    for (const L of g.loops) {
-      c.beginPath();
-      for (let i = 0; i <= 96; i++) {
-        const th = i / 96 * 6.2832;
-        const rr = L.s * (1 + L.w1 * Math.sin(3 * th + L.a + t * 0.05) + L.w2 * Math.sin(5 * th + L.b));
-        const x = Math.cos(th) * rr * sx * 0.98, y = (Math.sin(th) * rr * 0.62 - 0.32 + L.oy) * sy;
-        i ? c.lineTo(x, y) : c.moveTo(x, y);
-      }
-      c.stroke();
-    }
-    for (const P of g.walks) { c.beginPath(); P.forEach(([x, y], i) => i ? c.lineTo(x * sx, y * sy) : c.moveTo(x * sx, y * sy)); c.stroke(); }
-    c.restore();
-    // oral arms: thick ribbons with a white seam
-    c.lineCap = 'round';
-    for (const A of g.arms) {
-      const pts = [];
-      for (let i = 0; i <= 40; i++) {
-        const u = i / 40, y = 0.08 * sy + u * A.len * R;
-        const x = A.x * sx + Math.sin(t * 0.6 + A.ph + u * 4.2) * 0.07 * R * Math.pow(u, 1.2) + Math.sin(u * 14 + A.ph) * 0.025 * R;
-        pts.push([x, y]);
-      }
-      c.strokeStyle = k.color; c.lineWidth = A.w * R; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); c.stroke();
-      c.strokeStyle = '#fff'; c.lineWidth = 1; c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x + Math.sin(i * 0.9) * 1.5, y) : c.moveTo(x, y)); c.stroke();
-    }
-    // tentacles
-    c.strokeStyle = k.color; c.lineWidth = 1.3;
-    for (const T of g.tent) {
-      c.beginPath();
-      for (let i = 0; i <= 44; i++) {
-        const u = i / 44, y = 0.05 * sy + u * T.len * R;
-        const x = T.x * sx * (1 - 0.18 * u) + (Math.sin(t * 0.85 + T.ph + u * 3.4) * T.amp + T.curl * u * u) * R * Math.pow(u, 1.3);
-        i ? c.lineTo(x, y) : c.moveTo(x, y);
-      }
-      c.stroke();
-    }
-  }
-  size();
-  let last = -1e9, t0 = performance.now();
-  const draw = now => { const t = reduced ? 2 : (now - t0) / 1000; inks.forEach(k => drawInk(k, t)); };
-  draw(t0);
-  new ResizeObserver(() => { size(); draw(performance.now()); }).observe(plate);
-  actor(art, now => {
-    if (reduced) return false;
-    if (now - last > 40) { draw(now); last = now; }
-    return true;
-  });
-}
+    <article data-p="sea" hidden>
+      <div class="band" data-band data-tint="#0f7f7a" data-pattern="waves"></div>
+      <div class="body">
+        <div class="mon lg" data-mon="rose"></div>
+        <h1>Seafaring map</h1>
+        <p class="lede">Can free wind and ocean data predict where Bronze Age harbours still lie buried around the Arabian Sea?</p>
+        <p>I built a seasonal drift and sailing model from ERA5 wind reanalysis and GLORYS ocean currents, divided the ancient coast into 499 segments, and scored each by its position in the network that results.</p>
+        <p>The test was whether network position predicts where radiocarbon-dated Bronze Age activity actually is. The dates were kept blind. The pre-registration went through four rounds of adversarial review by a separate referee agent, a power study on synthetic worlds and a two-look design, and was sealed to a git commit hash.</p>
+        <p>Some of the dates exist only in print, so I went to the stacks at the University of Queensland and the State Library, with Claude on my phone directing which tables to photograph; each page was read by OCR and verified against its image before entering the corpus.</p>
+        <p>Look 1 ran at 42 events: p = 0.186 against a threshold of 0.02. It is recorded as uninformative, not as evidence either way, and the remaining alpha carries to Look 2.</p>
+      </div>
+      <section class="pin" data-pin data-demo>
+        <div class="stage">
+          <div class="map" data-map></div>
+          <div class="copy">
+            <h3>Treasure hunting with free data</h3>
+            <ol class="steps">
+              <li>Start with the coast as it stood four thousand years ago. Cut it into 499 stretches.</li>
+              <li>Add the weather. Decades of free wind and ocean data show where a boat would drift or sail in every month.</li>
+              <li>Score each stretch by how much of that traffic passes it. A high score is a natural harbour on a busy sea road.</li>
+              <li>Lay down the Bronze Age sites already found. Their dates stayed hidden while the model was built.</li>
+              <li>High scores with no site yet are the prediction. They are where to dig next.</li>
+              <li>The test was sealed before it ran. The first look at 42 dated events was inconclusive. The second waits for 55.</li>
+            </ol>
+            <p class="goal">A sketch of the method. Not the model’s output.</p>
+          </div>
+        </div>
+      </section>
+      <button class="back end" data-back>All work</button>
+    </article>
 
-/* =========================================================
-   Project MAGI: one page of the record on a dark instrument.
-   The page is set as words, a few of them are marked, and
-   each mark sends a thread out to the entity it names, so
-   several spans across the page converge on one node. The
-   last thread hasn't found its entity yet.
-   ========================================================= */
-function mesh() {
-  const svg = $('.mesh'); if (!svg) return;
-  const NS = 'http://www.w3.org/2000/svg';
-  const VW = 300, VH = 240;
-  svg.setAttribute('viewBox', `0 0 ${VW} ${VH}`);
-  const el = (n, a, p = svg) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
-  const R = rng(1947);
-  const PAGE = ink('magi-page'), WORD = ink('magi-word'), INK = ink('ink'), RED = ink('magi-red'), VIO = ink('magi-violet'), PALE = ink('magi-pale');
-  const px0 = 26, py0 = 24, pw = 132, ph = 192, mx = 12;
-  const gPage = el('g', {}), gThr = el('g', {}), gEnt = el('g', {});
-  el('rect', { class: 'pg', x: px0, y: py0, width: pw, height: ph, fill: PAGE }, gPage);
-  // set the page: paragraphs of words, a first-line indent, ragged last lines,
-  // and the occasional redaction bar where the record was blacked out
-  const words = []; let y = py0 + 16, li = 0;
-  for (const n of [5, 7, 4, 6]) {
-    for (let i = 0; i < n; i++) {
-      const L = px0 + mx, Rr = px0 + pw - mx;
-      const end = i === n - 1 ? L + (Rr - L) * (0.3 + R() * 0.4) : Rr;
-      const g = el('g', { class: 'ln', style: `--d:${(0.15 + li * 0.03).toFixed(3)}s` }, gPage);
-      let x = L + (i === 0 ? 7 : 0);
-      while (x < end - 2.5) {
-        let w = 2.6 + R() * R() * 15; if (x + w > end) w = end - x;
-        const redact = R() < 0.06 && w > 5;
-        el('rect', { x: x.toFixed(2), y: (y - (redact ? 1.9 : 1)).toFixed(2), width: (redact ? w + 6 : w).toFixed(2), height: redact ? 3.8 : 2, fill: redact ? INK : WORD }, g);
-        if (!redact) words.push({ x, w, y, li });
-        x += (redact ? w + 6 : w) + 2.3;
-      }
-      y += 6.6; li++;
-    }
-    y += 4.2;
-  }
-  // entities, out on the dark: a few nodes the record keeps returning to
-  const ents = [
-    { x: 228, y: 58, r: 5.2, c: RED }, { x: 262, y: 104, r: 3.8, c: VIO },
-    { x: 220, y: 150, r: 4.4, c: PALE }, { x: 256, y: 192, r: 3.4, c: RED },
-  ];
-  // marked spans, each threaded to its entity; two or three per entity
-  const byLine = new Map(); words.forEach(w => { if (w.w > 6 && !byLine.has(w.li)) byLine.set(w.li, []); if (w.w > 6) byLine.get(w.li).push(w); });
-  const lines = [...byLine.keys()];
-  const plan = [[1, 0], [3, 1], [5, 0], [8, 2], [10, 1], [12, 3], [14, 2], [17, 0], [19, 3]];
-  let k = 0, lastSpan;
-  for (const [ln, ei] of plan) {
-    const cand = byLine.get(lines[Math.min(ln, lines.length - 1)]); if (!cand) continue;
-    const s = cand[Math.floor(R() * cand.length)], e = ents[ei];
-    const d = (1.0 + k * 0.12).toFixed(2);
-    el('rect', { class: 'sp', x: (s.x - 0.6).toFixed(2), y: (s.y - 2.1).toFixed(2), width: (s.w + 1.2).toFixed(2), height: 4.2, fill: e.c === PALE ? VIO : e.c, style: `--d:${d}s` }, gPage);
-    // the thread leaves from the margin on the span's own line
-    const col = e.c === PALE ? VIO : e.c, x1 = px0 + pw, len = 3 + Math.hypot(e.x - x1 - 3, e.y - s.y);
-    el('path', { class: 'th', d: `M${x1} ${s.y.toFixed(2)}h3L${e.x} ${e.y}`, fill: 'none', stroke: col, 'stroke-width': 0.5, style: `--len:${len.toFixed(1)};--d:${(+d + 0.15).toFixed(2)}s` }, gThr);
-    lastSpan = s; k++;
-  }
-  // entity to entity: relations the mesh has inferred
-  [[0, 2], [1, 3]].forEach(([a, b], j) => {
-    const A = ents[a], B = ents[b], len = Math.hypot(B.x - A.x, B.y - A.y);
-    el('line', { class: 'th', x1: A.x, y1: A.y, x2: B.x, y2: B.y, stroke: PALE, 'stroke-width': 0.35, 'stroke-opacity': 0.55, style: `--len:${len.toFixed(1)};--d:${(2.4 + j * 0.2).toFixed(2)}s` }, gThr);
-  });
-  ents.forEach((e, j) => {
-    const d = `--d:${(1.5 + j * 0.15).toFixed(2)}s`;
-    el('circle', { class: 'en', cx: e.x, cy: e.y, r: e.r, fill: e.c, style: d }, gEnt);
-    el('circle', { class: 'en', cx: e.x, cy: e.y, r: e.r + 3, fill: 'none', stroke: e.c, 'stroke-width': 0.35, 'stroke-opacity': 0.6, style: d }, gEnt);
-  });
-  // the unfinished thread: a span in the last paragraph, its line still searching
-  const lastWords = words.filter(w => w.li === li - 2 && w.w > 5);
-  const s = lastWords[Math.floor(lastWords.length / 2)] || lastSpan;
-  el('rect', { class: 'sp', x: (s.x - 0.6).toFixed(2), y: (s.y - 2.1).toFixed(2), width: (s.w + 1.2).toFixed(2), height: 4.2, fill: 'none', stroke: RED, 'stroke-width': 0.5, style: '--d:2.3s' }, gPage);
-  // its thread runs out toward an entity the mesh hasn't resolved yet
-  const x1 = px0 + pw, ex = 214, ey = Math.min(VH - 14, s.y + 8);
-  el('path', { d: `M${x1} ${s.y.toFixed(2)}h3L${ex - 4.4} ${ey}`, fill: 'none', stroke: RED, 'stroke-width': 0.5, 'stroke-dasharray': '1.2 1.3', class: 'sp', style: '--d:2.6s' }, gThr);
-  el('circle', { class: 'caret', cx: ex, cy: ey, r: 3.6, fill: 'none', stroke: RED, 'stroke-width': 0.6 }, gThr);
-}
+    <article data-p="making" hidden>
+      <div class="band" data-band data-tint="#c4321c" data-pattern="morris"></div>
+      <div class="body">
+        <div class="mon lg" data-mon="clasp"></div>
+        <h1>How this site was built</h1>
+        <p class="lede">Every mark here is code. Made with Claude in one conversation.</p>
+      </div>
+      <section class="reelpin" data-reel>
+        <div class="reelstage">
+          <p class="reeltext" aria-live="polite"></p>
+          <div class="reel">
+            <figure class="card"><img src="making/mood.jpg" alt="The incipit moodboard"><p>It began in <a href="https://github.com/clovis3000/mood">my moodboard tool</a>. Claude reads a board through its command line as easily as I look at it. The seed was one cover of idea magazine where medieval pages and Swiss grids and Japanese type share a spread.</p></figure>
+            <figure class="card" data-plate="01-bristle"><img src="making/01.jpg" alt=""><p>The first study was a brush. Each bristle carries its own ink and runs dry on its own.</p></figure>
+            <figure class="card" data-plate="02-sumi"><img src="making/02.jpg" alt=""><p>Then ink on the GPU. Water and pigment move through simulated paper fibre and dry darker at the edge.</p></figure>
+            <figure class="card" data-plate="04-meander"><img src="making/04.jpg" alt=""><p>A river that migrates and cuts off its own loops. After Harold Fisk’s maps of the Mississippi.</p></figure>
+            <figure class="card"><img src="making/10s.jpg" alt=""><p>Every animation was judged on a contact sheet. Twelve frames side by side. Claude reads the sheet and decides what to change next.</p></figure>
+            <figure class="card" data-plate="08-littera"><img src="making/08.jpg" alt=""><p>Some studies went too far. That is how we found the edges.</p></figure>
+            <figure class="card" data-plate="09-bristle-gpu"><img src="making/07.jpg" alt=""><p>The canvas brush dropped frames here. So every bristle moved onto the GPU.</p></figure>
+            <figure class="card" data-plate="10-ma"><img src="making/10.jpg" alt=""><p>Morris on an ogee lattice with one circle cut out of it. The first time the two styles met on the page.</p></figure>
+            <figure class="card" data-plate="13-folio"><img src="making/13.jpg" alt=""><p>Gold leaf with a real light. Each square tilts its own way and catches the pointer.</p></figure>
+            <figure class="card" data-plate="14-byobu"><img src="making/14.jpg" alt=""><p>Painted to every edge. A wet ground first. Then gold. Then chalky colour in broad strokes.</p></figure>
+            <div class="card text"><p>Underneath is a small engine. Every bristle of every stroke is laid down once on the GPU with the moment it gets painted. A frame is one draw call against a clock. Scrolling moves the clock. Stencils keep a brush inside a circle. Each page has its own camera.</p></div>
+          </div>
+        </div>
+      </section>
+      <button class="back end" data-back>All work</button>
+    </article>
+  </div>
+  <button class="back" data-back>All work</button>
+</div>
 
-/* =========================================================
-   The thesis as a technical plate. Two hairlines per edge,
-   one each way, in two inks; small packets travel them
-   slowly once the drawing has settled. The vertices carry
-   the opening triangle's three corner inks.
-   ========================================================= */
-function diagram() {
-  const svg = $('.diagram svg'); if (!svg) return;
-  const NS = 'http://www.w3.org/2000/svg';
-  const el = (n, a, p = svg) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); p.appendChild(e); return e; };
-  const V = [{ x: 320, y: 86, n: 'logic' }, { x: 84, y: 478, n: 'human' }, { x: 556, y: 478, n: 'agent' }];
-  const r = 40, VIO = ink('logic'), TEAL = ink('agent'), INK = ink('ink');
-  const defs = el('defs', {});
-  for (const [id, col] of [['av', VIO], ['at', TEAL]]) {
-    const m = el('marker', { id, viewBox: '0 0 10 10', refX: 9, refY: 5, markerWidth: 9, markerHeight: 9, orient: 'auto-start-reverse', markerUnits: 'userSpaceOnUse' }, defs);
-    el('path', { d: 'M0 1.2 9.5 5 0 8.8z', fill: col }, m);
-  }
-  const edges = [[0, 1, 'GUI'], [0, 2, 'CLI · API · MCP'], [1, 2, 'chat']];
-  const lanes = [];
-  const gE = el('g', {}), gP = el('g', {}), gV = el('g', {}), gL = el('g', {});
-  edges.forEach(([a, b, name], k) => {
-    const A = V[a], B = V[b];
-    const dx = B.x - A.x, dy = B.y - A.y, L = Math.hypot(dx, dy), ux = dx / L, uy = dy / L, nx = -uy, ny = ux;
-    const pad = r + 16, off = 7;
-    [[1, VIO, 'av'], [-1, TEAL, 'at']].forEach(([s, col, mk], j) => {
-      const sx = A.x + ux * pad + nx * off * s, sy = A.y + uy * pad + ny * off * s;
-      const ex = B.x - ux * pad + nx * off * s, ey = B.y - uy * pad + ny * off * s;
-      const [x1, y1, x2, y2] = s > 0 ? [sx, sy, ex, ey] : [ex, ey, sx, sy];
-      const len = Math.hypot(x2 - x1, y2 - y1);
-      el('line', { class: 'edge', x1, y1, x2, y2, stroke: col, 'stroke-width': 1.6, 'marker-end': `url(#${mk})`, style: `--len:${len.toFixed(1)};--d:${(0.5 + k * 0.18 + j * 0.1).toFixed(2)}s` }, gE);
-      lanes.push({ x1, y1, x2, y2, col, ph: (k * 0.37 + j * 0.5) % 1, dot: el('circle', { r: 3.2, fill: col, opacity: 0 }, gP) });
-    });
-    // label sits outside the triangle, on the edge's outer normal
-    const mx = (A.x + B.x) / 2, my = (A.y + B.y) / 2;
-    const cxT = (V[0].x + V[1].x + V[2].x) / 3, cyT = (V[0].y + V[1].y + V[2].y) / 3;
-    const sgn = (nx * (mx - cxT) + ny * (my - cyT)) > 0 ? 1 : -1;
-    const lx = mx + nx * 30 * sgn, ly = my + ny * 30 * sgn;
-    const ang = Math.atan2(dy, dx) * 180 / Math.PI, rot = ang > 90 || ang < -90 ? ang + 180 : ang;
-    const t = el('text', { class: 'lbl', x: lx, y: ly, 'text-anchor': 'middle', 'dominant-baseline': 'middle', transform: `rotate(${rot.toFixed(2)} ${lx} ${ly})`, 'font-family': 'Archivo, sans-serif', 'font-size': 14, 'font-weight': 600, 'letter-spacing': 2.2, fill: INK, style: `--d:${(1.1 + k * 0.15).toFixed(2)}s` }, gL);
-    t.textContent = name.toUpperCase();
-  });
-  V.forEach((v, k) => {
-    const g = el('g', { class: 'vx', style: `--d:${(0.15 + k * 0.12).toFixed(2)}s` }, gV);
-    el('circle', { cx: v.x, cy: v.y, r, fill: ink(v.n) }, g);
-    const ny = k === 0 ? v.y - r - 18 : v.y + r + 34;
-    const nm = el('text', { class: 'lbl', x: v.x, y: ny, 'text-anchor': 'middle', 'font-family': 'Newsreader, serif', 'font-size': 26, 'font-style': 'italic', fill: INK, style: `--d:${(0.9 + k * 0.12).toFixed(2)}s` }, gL);
-    nm.textContent = 'the ' + v.n;
-  });
-  const host = $('.thesis');
-  let t0 = null, last = -1e9;
-  actor(host, now => {
-    if (reduced || !host.classList.contains('in')) return false;
-    if (t0 === null) t0 = now + 2400;
-    if (now - last < 33) return true;
-    last = now;
-    const t = (now - t0) / 1000;
-    for (const L of lanes) {
-      const P = 6.5, u = ((t / P + L.ph) % 1 + 1) % 1;
-      const on = t > 0 ? Math.sin(Math.PI * clamp((u - 0.04) / 0.86, 0, 1)) : 0;
-      L.dot.setAttribute('cx', lerp(L.x1, L.x2, u).toFixed(1));
-      L.dot.setAttribute('cy', lerp(L.y1, L.y2, u).toFixed(1));
-      L.dot.setAttribute('opacity', (on * 0.95).toFixed(2));
-    }
-    return true;
-  });
-}
+<nav id="rail" aria-label="Sections">
+  <a href="#index" data-to="hero">Index</a>
+  <a href="#pum" data-to="pum">Pum</a>
+  <a href="#magi" data-to="magi">MAGI</a>
+  <a href="#sea" data-to="sea">Seafaring</a>
+  <a href="#write" data-to="write">Write</a>
+</nav>
 
-/* =========================================================
-   Airbrushed bands under the address. Drawn once, as a
-   still; the boundaries between bands are sprayed, so each
-   one bleeds a few droplets into the next.
-   ========================================================= */
-function bands() {
-  const host = $('.bands'); if (!host) return;
-  const cv = $('canvas', host), ctx = cv.getContext('2d');
-  const B = [
-    [1.0, [[0, 'a9c27a'], [.38, '3c9363'], [.72, '2b809a'], [1, 'a4cccb']]],
-    [0.8, [[0, '55745a'], [.30, '2a8a62'], [.74, '1f6f9a'], [1, '86b8cc']]],
-    [1.0, [[0, '8a8496'], [.26, '403c56'], [.70, '4b3b6e'], [1, '958cad']]],
-    [1.0, [[0, '958a6c'], [.24, '504838'], [.64, '4d3b5a'], [1, '75658e']]],
-    [0.9, [[0, 'b0d1c6'], [.34, '41a08b'], [.70, '2b90a8'], [1, '97cbd2']]],
-    [1.3, [[0, 'a6c8e8'], [.40, '4079c8'], [.52, '3d87b2'], [.70, '40a062'], [1, 'acd3a6']]],
-    [1.0, [[0, 'c0b770'], [.34, '5f8d48'], [.72, '205c3e'], [1, '8cae8c']]],
-  ];
-  const hex = h => [0, 2, 4].map(i => parseInt(h.slice(i, i + 2), 16));
-  let drawnW = 0;
-  function render() {
-    const r = host.getBoundingClientRect(), dpr = Math.min(1.5, devicePixelRatio || 1);
-    const W = Math.round(r.width * dpr), H = Math.round(r.height * dpr);
-    if (!W || !H || W === drawnW) return;
-    drawnW = W; cv.width = W; cv.height = H;
-    const luts = B.map(([, stops]) => {
-      const lut = new Float32Array(W * 3), cs = stops.map(([p, h]) => [p, hex(h)]);
-      for (let x = 0, j = 0; x < W; x++) {
-        const t = x / (W - 1);
-        while (j < cs.length - 2 && t > cs[j + 1][0]) j++;
-        const [p0, c0] = cs[j], [p1, c1] = cs[j + 1], k = clamp((t - p0) / (p1 - p0), 0, 1), s = k * k * (3 - 2 * k);
-        for (let c = 0; c < 3; c++) lut[x * 3 + c] = c0[c] + (c1[c] - c0[c]) * s;
-      }
-      return lut;
-    });
-    const total = B.reduce((a, b) => a + b[0], 0), edges = [0];
-    B.reduce((a, b) => { edges.push((a + b[0]) / total * H); return a + b[0]; }, 0);
-    const R = rng(11), GX = 18, GY = 7, grid = Float32Array.from({ length: (GX + 1) * (GY + 1) }, R);
-    const img = ctx.createImageData(W, H), d = img.data, soft = Math.max(3, H * 0.014);
-    for (let y = 0, bi = 0; y < H; y++) {
-      while (bi < B.length - 1 && y >= edges[bi + 1]) bi++;
-      const dTop = y - edges[bi], dBot = edges[bi + 1] - y, fy = y / H * GY, iy = Math.min(GY - 1, fy | 0), ty = fy - iy;
-      const shade = 1 - 0.07 * (dTop / (edges[bi + 1] - edges[bi]));
-      for (let x = 0; x < W; x++) {
-        let b = bi; const g = R();
-        if (dTop < soft && bi > 0 && g > 0.5 + 0.5 * dTop / soft) b = bi - 1;
-        else if (dBot < soft && bi < B.length - 1 && g > 0.5 + 0.5 * dBot / soft) b = bi + 1;
-        const fx = x / W * GX, ix = fx | 0, tx = fx - ix, o0 = iy * (GX + 1) + ix;
-        const m = (grid[o0] * (1 - tx) + grid[o0 + 1] * tx) * (1 - ty) + (grid[o0 + GX + 1] * (1 - tx) + grid[o0 + GX + 2] * tx) * ty;
-        const k = shade * (0.92 + 0.12 * m) + (R() - 0.5) * 0.11, L = luts[b], i3 = x * 3, o = (y * W + x) * 4;
-        d[o] = L[i3] * k; d[o + 1] = L[i3 + 1] * k; d[o + 2] = L[i3 + 2] * k; d[o + 3] = 255;
-      }
-    }
-    ctx.putImageData(img, 0, 0);
-  }
-  const io = new IntersectionObserver(es => { if (es.some(e => e.isIntersecting)) { render(); io.disconnect(); } }, { rootMargin: '600px' });
-  io.observe(host);
-  let t; new ResizeObserver(() => { if (!drawnW) return; clearTimeout(t); t = setTimeout(render, 200); }).observe(host);
-}
-
-/* ---- title lines fitted to the measure ---- */
-function fitTitle() {
-  for (const n of $$('.title .fit')) {
-    n.style.fontSize = '100px';
-    const w = n.getBoundingClientRect().width, target = n.parentElement.clientWidth;
-    n.style.fontSize = (100 * target / w * 0.995).toFixed(2) + 'px';
-  }
-}
-
-/* ---- reveals: each section draws once as it comes into view ---- */
-function reveals() {
-  const io = new IntersectionObserver(es => es.forEach(e => {
-    if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); wake(); }
-  }), { threshold: 0.16, rootMargin: '0px 0px -6% 0px' });
-  $$('[data-reveal]').forEach(n => io.observe(n));
-}
-
-requestAnimationFrame(() => $('.hero').classList.add('on'));
-try { triangle(); } catch (e) { console.warn(e); $('.art').classList.add('nogl'); }
-bar();
-jellyfish(); mesh(); diagram(); bands(); reveals();
-(document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(fitTitle);
-fitTitle();
-let rt; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(fitTitle, 80); });
-})();
-</script>
-</body>
-</html>
+<script type="module" src="./site.js"></script>

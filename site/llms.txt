@@ -1,0 +1,125 @@
+# Lewis Thompson
+
+> Self-taught product engineer on the Sunshine Coast, Queensland, Australia. I designed, built and shipped Pum, a native iOS app for endometriosis, and I run its production infrastructure alone. I am building Project MAGI, a document-intelligence platform over the US government's UAP disclosure record. I work AI-native: Claude Code is my daily driver, and I run my projects through agents under written governance. This file is the dense version of lewisthompson.dev, written for agents and for anyone who wants the detail.
+
+Last updated: 15 October 2026.
+
+## At a glance
+
+- Looking for: AI engineering, forward-deployed AI engineering and product engineering roles.
+- Location: Sunshine Coast, Queensland. Timezone AEST (UTC+10, no daylight saving). Commutable to Brisbane; open to remote and hybrid.
+- Availability: full-time, immediately.
+- Contact: lewispthompson.software@proton.me
+- Résumé: https://lewisthompson.dev/lewis-thompson-resume.pdf
+- Code: Pum and MAGI are closed source. I'm glad to give a private walkthrough of either codebase on a call.
+- Education: studies in mathematics and law at the University of Queensland.
+
+## Pum
+
+https://pum.me · App Store: "pum - endometriosis tracker"
+
+A period and symptom tracker built for endometriosis, for iPhone. Free, no account, and the data stays on her phone.
+
+Facts:
+
+- Launched on the App Store on 20 July 2026 (version 3.0.0) after a solo build that began in July 2025. Current version line 3.4, with 45 tagged releases.
+- About 184,000 lines of Swift (excluding generated bindings) and 78,000 lines of Rust, over 1,694 commits. Built alone, including design, copy, App Store work and operations.
+- Architecture: a SwiftUI app over a Rust engine compiled to a static library with UniFFI-generated Swift bindings. The engine holds cycle detection, the insight models and the hypothesis ledger, so the same code can run in the app, in a macOS test harness and in a simulation CLI.
+- Ranks #4 in US App Store search for "endometriosis tracker".
+
+What it does:
+
+- Cycle, symptom, sleep, pain and medication tracking shaped around endometriosis and adenomyosis. Imports periods and sleep from Apple Health.
+- Insights: n-of-1 models over her own history (for example, whether poor sleep precedes pain days for her), using a case-crossover estimator, so each person is compared with herself rather than with a population average.
+- An eval harness gates the insight models. A candidate model is run against its baseline on simulated data and must show more statistical power at a false-positive rate no higher than 5% before it replaces the baseline. Results are written as JSON with the engine's git SHA.
+- Export for AI. Pum calls no LLM. Instead she can export everything, or chosen sections, over a time window, ready to paste into Claude, ChatGPT or Gemini. The export states what it includes, what she has but left out, what Pum tracks that she hasn't logged, and what doesn't apply to her now, so the assistant doesn't mistake missing data for absent symptoms.
+- Doctor's report. A printable PDF structured to NICE guideline NG73 that cites the guideline for her country (RANZCOG, ESHRE or ACOG), on A4 or Letter. Pum keeps no copy.
+- Pum Circle (built, not yet live; part of the pum+ subscription launching Q4 2026). A companion app for someone she trusts. Pairing uses a code, with no accounts. Data is end-to-end encrypted with AES-256-GCM, and the sync server is a mailbox that stores one opaque blob per pairing and only SHA-256 hashes of bearer tokens.
+
+Operations, all run by me:
+
+- Rust (Axum) services with Postgres behind nginx and systemd, on a DigitalOcean droplet and a Hetzner dedicated server.
+- They serve the marketing site and waitlist API, an admin dashboard, a crash breadcrumb collector and the Circle sync server.
+- Release engineering: StoreKit 2, App Store review, listing management, and a dated ledger of every change to what the store shows, so metrics can be read against what was live when they moved.
+
+Research behind it:
+
+- Before building features I scraped and analysed about 11,800 App Store reviews across six competing period-tracking apps with an in-house tool (`arb`: a Rust CLI that harvests Apple's public review data, classifies and embeds reviews, searches them with sqlite-vec and runs batched LLM analysis). It ranked unmet demand. For example, paywall complaints rose from 19% of negative reviews in 2019 to 48% in 2026.
+
+## Project MAGI
+
+https://projectmagi.app
+
+An instrument for the UAP disclosure record. The US government's UAP releases (National Archives Record Group 615, the PURSUE release, Project Blue Book) arrive as bulk ZIPs and page-at-a-time government viewers. MAGI ingests them, extracts entities, and joins everything into one mesh where every assertion resolves to a page and a span in the original. It takes no position on what UAPs are.
+
+Facts:
+
+- Live with 290 documents and about 8,900 pages from seven collections (October 2026). The full record is roughly 116,000 pages and is being fetched from source onto a dedicated server.
+- About 32,000 lines of Rust and 15,000 of TypeScript, over 277 commits since May 2026.
+- Pipeline: OCR, then named-entity extraction, then embeddings, run in Python on rented GPUs (Vast.ai). Each page gets a quality score (clean, garbled or empty) so bad OCR is counted rather than hidden.
+- Storage: original files live on disk, addressed by hash. Postgres holds metadata, extracted text, entities and pgvector embeddings. Corpus-extracted data, editorial data and user data are separate provenance tiers that never share a table, so a user's theory can never sit beside an entity extracted from a government document.
+- Serving: a Rust (Axum) API, and a React reader with IIIF page images.
+- Agent surface: a read-only JSON API at https://projectmagi.app/api covering search, documents, entities, agencies, sightings, the map and the timeline. Try `/api/census` for coverage by collection, or `/api/search?q=radar`. A CLI and an MCP server over the same grammar are planned; they are not built yet.
+
+Design rules that came from real mistakes (from MAGI's known-issues record):
+
+- Don't store a value more precisely than its source states it. A date written as "October, 2023" stored in a bare date column becomes 1 January, indistinguishable from a real filing date. Every imprecise value carries its stated precision and its raw source phrase.
+- Don't let a parser fall back to a coarser reading when it fails. Return nothing and count it.
+- Don't report a count as coverage of a source without comparing it to that source.
+- Don't add a check that is only an internal consistency check. Three separate incidents each produced a perfectly self-consistent database, and each was caught only by comparing against something outside it.
+- Don't present filing density as incident density, or document dates as event dates. The record measures the paperwork, not the phenomenon.
+
+## Field notes
+
+### The parser that degraded instead of refusing (MAGI, 11 October 2026)
+
+109 of 197 dated documents were stored as 1 January. The loader matched one date shape and fell back to the year for everything else, including 26 documents whose month was available upstream and thrown away. It went unnoticed for five months because the database was self-consistent. The fix was a rule rather than a patch: every imprecise value now carries its stated precision and its source text, and a parser that can't read a value returns nothing and increments a counter.
+
+### 56% of a release, reported as the release (MAGI, 11 October 2026)
+
+A fetch filtered to PDFs pulled 211 of the PURSUE release's 375 records. Every downstream count was accurate. Nothing compared them to the release index, which had been in the repository the whole time. Coverage is now reported against each release's own index (see `/api/census`).
+
+### Precision derived from the writing (MAGI, 11 October 2026)
+
+A 10 km military grid square, a whole-degree coordinate pair written in prose, and a reading to the second were all stored as equally precise "site" locations. Precision now comes from what the source says, not from the notation it was typed in. Decimals count: "35.5224°N" is an eleven-metre statement.
+
+### A test sealed before it was run (Seafaring map, 29 August 2026)
+
+Described below. The first look at the data returned p = 0.19 against a threshold of 0.02 and was recorded as uninformative, which is what the sealed rules said it was.
+
+## Seafaring map (research)
+
+A question from archaeology: did Bronze Age harbours around the Arabian Sea sit where winds and currents made a natural sailing network?
+
+- I built a seasonal drift and sailing model from ERA5 wind reanalysis and GLORYS ocean currents, divided the paleo-coast into 499 segments, and scored each by its position in the resulting network (connectivity and betweenness).
+- The test: does network position predict where radiocarbon-dated Bronze Age activity actually is? The radiocarbon record was kept blind. Site locations were seen, but no relationship between the predictors and the sites was computed before the test was sealed.
+- The pre-registration went through four rounds of adversarial review by a separate referee agent (over 90 findings, each with a recorded disposition), a power study on synthetic worlds, and a two-look group-sequential design. It was sealed to a git commit hash.
+- The radiocarbon dates came from open aggregators and from journals of the 1960s to 1980s. Some exist only in print, so I went to the stacks at the University of Queensland and the State Library of Queensland, with Claude on my phone directing which tables and pages to photograph. Each page went through Apple Vision OCR and then model verification against the page image before entering the corpus with its provenance.
+- Look 1 ran at 42 events: p = 0.186 on the primary test (threshold 0.02) and p = 0.052 on the secondary (threshold 0.005). Neither fired. The result is recorded as uninformative, not as evidence for or against, and the remaining alpha carries to Look 2, which triggers at 55 events.
+
+## Other work
+
+- Oracle of the Inn (https://oracle.3rigby.xyz): a multi-turn LLM character quiz for a pub-trivia night, on Anthropic's API. Rust (Axum, SQLite), vanilla front-end. The hard problem was prompt engineering: getting the model to write what it saw beneath the players' answers rather than restating them.
+- benchme: a small eval harness pitting people against Claude models on quiz sets, across thinking modes, with an answer grader. The model's predictions about its own scores were sealed by SHA-256 hash before the runs and scored afterwards.
+- Mascot pipeline (image-to-lottie): generative-media R&D that turns a still mascot into an animation through several video models. It keeps a run log with the cost and automated quality scores of each run.
+- Platonica (2024 to 2025): a desktop AI workspace (Tauri, React, Rust) with branching chat threads, notes, semantic search and multiple model providers. Built solo to a working alpha over about 500 commits; never publicly released.
+- Lightweight (https://lightweight.3rigby.xyz): a multi-user workout tracker. Rust (Axum) and SQLite backend, native Android client in Kotlin and Compose, React dashboard.
+- Freelance Solidity smart-contract auditing (2022 to 2023): independent protocol audits and bug-bounty submissions.
+
+## How I build
+
+- Claude Code CLI is my daily driver, in tmux.
+- I set each project's goals, the checkpoints where work stops for my review, and the verification criteria and constraints every task must meet. Work then runs in parallel across worker agents in isolated git worktrees, under a supervising agent. Engineering calls are made by the supervisor and recorded; product calls come to me with a recommendation.
+- Facts have one home. A written fact stays true only if the event that changes it also forces its update, so descriptive docs are kept to a minimum.
+- Agent memory files hold anti-patterns with their rationale and the date of the incident behind them, because those stay true for as long as the mistake is still possible.
+- Gates are checked on disk (files, greps, screenshots) before work is accepted.
+- Repeated checks become tripwires: small scripts in a project's task runner that fail the build when a known class of mistake comes back. Pum has them for its data models, its design rules and its tone-of-voice vocabulary.
+- I build both edges of what I make. A human interface, and an interface an agent can use: a CLI, an API, an export, or a file like this one.
+
+## Stack
+
+- Languages: Swift and SwiftUI, Rust, Python, TypeScript and React, SQL.
+- Data: Postgres, pgvector, SQLite, sqlite-vec.
+- Infrastructure: Linux servers (DigitalOcean, Hetzner), nginx, systemd, rsync deploys, cross-compilation from macOS, GitHub Actions.
+- AI: Claude Code, the Anthropic and OpenAI APIs, multi-agent orchestration, embeddings and retrieval, OCR with model verification.
+

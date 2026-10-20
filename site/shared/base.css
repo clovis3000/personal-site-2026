@@ -1,0 +1,17 @@
+:root { --ink: #1a1816; --muted: #9a9ea6; --blue: #8fb8de; --verm: #d6402a; }
+html, body { margin: 0; height: 100%; background: #fff; color: var(--ink); }
+body { font: 12px/1.45 "Helvetica Neue", Helvetica, Arial, sans-serif; -webkit-font-smoothing: antialiased; }
+.stage { position: fixed; inset: 0; display: grid; place-items: center; cursor: pointer; }
+canvas { display: block; }
+.meta { position: fixed; left: 24px; top: 18px; color: var(--muted); letter-spacing: .04em; pointer-events: none; }
+.meta b { color: var(--ink); font-weight: 600; margin-right: .6em; }
+.meta a { pointer-events: auto; color: inherit; }
+.cap { position: fixed; left: 24px; bottom: 18px; max-width: 34em; color: var(--muted); opacity: 0; transition: opacity 1.4s ease; pointer-events: none; }
+.rest .cap { opacity: 1; }
+.cap em { font-style: normal; color: var(--ink); }
+@media (max-width: 700px) { .meta, .cap { left: 16px; } }
+.fill .stage { place-items: stretch; }
+.fill .meta, .fill .cap { background: rgba(255,255,255,.86); padding: 4px 8px; border-radius: 2px; }
+
+.embed .meta, .embed .cap { display: none; }
+.embed .stage { cursor: default; }
