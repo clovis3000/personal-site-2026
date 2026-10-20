@@ -3,8 +3,11 @@
 import { paint } from './paint.js';
 import { layout } from './shared/bristles.js';
 
+// A plan that can't be painted is reported, not thrown: an uncaught error would end the worker for good.
 onmessage = ({ data: { id, plan } }) => {
-  const t0 = performance.now(), { S, masks, demo, sea } = paint(plan), t1 = performance.now(), L = layout(S);
-  L.stats.ms = [Math.round(t1 - t0), Math.round(performance.now() - t1)];   // paint, layout
-  postMessage({ id, L, masks, demo, sea }, [L.P.buffer, L.D.buffer, L.S.buffer, L.C.buffer, L.cum.buffer]);
+  try {
+    const t0 = performance.now(), { S, masks, demo, sea } = paint(plan), t1 = performance.now(), L = layout(S);
+    L.stats.ms = [Math.round(t1 - t0), Math.round(performance.now() - t1)];   // paint, layout
+    postMessage({ id, L, masks, demo, sea }, [L.P.buffer, L.D.buffer, L.S.buffer, L.C.buffer, L.cum.buffer]);
+  } catch (e) { postMessage({ id, error: String(e) }); }
 };

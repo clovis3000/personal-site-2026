@@ -62,9 +62,10 @@ const waiting = new Map();
 try {
   worker = new Worker(new URL('./paint-worker.js', import.meta.url), { type: 'module' });
   worker.onmessage = ({ data }) => { const w = waiting.get(data.id); waiting.delete(data.id); w?.res(data); };
+  // the worker itself failing to start (a browser without module workers): paint on the page instead
   worker.onerror = e => { console.warn('painter worker failed; painting on the page instead', e.message); worker = null; for (const [id, w] of waiting) { waiting.delete(id); w.res(local(w.plan)); } };
 } catch { worker = null; }
-function local(plan) { const { S, masks, demo, sea } = paint(plan); return { L: layout(S), masks, demo, sea }; }
+function local(plan) { try { const { S, masks, demo, sea } = paint(plan); return { L: layout(S), masks, demo, sea }; } catch (e) { return { error: String(e) }; } }
 const job = plan => new Promise(res => {
   if (!worker) return setTimeout(() => res(local(plan)));
   const id = ++seq; waiting.set(id, { res, plan }); worker.postMessage({ id, plan });
@@ -84,7 +85,8 @@ function pump() {
   const g = gen; working = true;
   job(measureProject(i)).then(out => {
     working = false;
-    if (g === gen) adoptProject(i, out); else todo.push(i);
+    if (out.error) console.warn(`painting ${PROJ[i]} failed`, out.error);
+    else if (g === gen) adoptProject(i, out); else todo.push(i);
     pump();
   });
 }
@@ -253,6 +255,8 @@ else {
   PROJ.forEach(() => D.push(new Bristles(dev, page.format)));
   const adoptIndex = ({ L, masks }, what) => { B.masks = masks; B.upload(L); performance.mark(`painting:${what}`, { detail: L.stats }); need(); };
   const build = () => {
+    // a window with no size yet (a background or prerendered tab) has nothing to measure: wait for its resize
+    if (innerWidth < 2 || innerHeight < 2) return;
     const dpr = Math.min(devicePixelRatio || 1, 2), g = ++gen, t = performance.now();
     const plan = measureIndex();
     page.resize(vw, vh, dpr); B.page = [vw, vh];
@@ -260,11 +264,11 @@ else {
     indexUp = false; todo = PROJ.map((_, i) => i);
     if (st.open >= 0) { todo.splice(st.open, 1); todo.unshift(st.open); }
     job({ ...plan, upto: 0 }).then(out => {
-      if (g !== gen) return;
+      if (g !== gen || out.error) return;
       adoptIndex(out, 'hero');
       if (st.open >= 0) { indexUp = true; pump(); }   // a page opened by its link goes before the rest of the index
       job(plan).then(out => {
-        if (g !== gen) return;
+        if (g !== gen || out.error) return;
         adoptIndex(out, 'index'); indexUp = true; pump();
         window.__stats = { ...B.stats, ms: Math.round(performance.now() - t) };
       });
