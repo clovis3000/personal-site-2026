@@ -63,6 +63,7 @@ export function mountMagi(section, scroller) {
     // the mesh, on the trellis's diamond lattice
     const pts = [];
     for (let r = 0; port ? mt + r * g * .5 <= mb : r * g * .5 < H * .62; r++) for (let c = 0; xr + c * g * .5 + g * .25 < mr; c++) if ((r + c) % 2 === 0) pts.push([xr + c * g * .5 + g * .25, mt + r * g * .5]);
+    if (!pts.length) { L = null; return; }   // a sheet too small to hold the mesh (mid-resize, mid-slide): draw nothing
     L.pts = pts;
     L.nodes = [.06, .3, .55, .19, .44, .7, .85, .95].map(f => pts[Math.min(pts.length - 1, Math.floor(f * pts.length))]);
   }

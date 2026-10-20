@@ -544,7 +544,7 @@ function frame(now) {
   st.light = st.light ? st.light.map((v, i) => v + (goal[i] - v) * .18) : goal.slice();
   if (Math.hypot(st.light[0] - goal[0], st.light[1] - goal[1]) > .5) busy = true;
   draw();
-  if (busy) need();
+  if (busy) { need(); lastBusy = now; }
 }
 
 function draw() {
@@ -640,6 +640,19 @@ function docs() {
   desk.classList.toggle('gather', p >= 3);
 }
 
+// Building a project page's painting blocks the main thread for most of a second (composing it, then laying
+// its segments out for the GPU), so it never runs while anything moves: only once nothing has animated or
+// scrolled for a while, one page per quiet spell. Hovering a way into a page builds it ahead of the click.
+let lastBusy = 0;
+function idleBuild(g) {
+  if (g !== gen) return;
+  const i = D.findIndex(L => !L.ready);
+  if (i < 0) return;
+  const quiet = !raf && performance.now() - lastBusy > 600;
+  if (quiet) buildProject(i);
+  setTimeout(() => (window.requestIdleCallback || setTimeout)(() => idleBuild(g), { timeout: 1500 }), quiet ? 500 : 250);
+}
+
 function buildProject(i) {
   if (D[i].ready) return;
   const { S, masks, demo, sea } = compose(i); D[i].masks = masks; D[i].load(S); D[i].ready = true; D[i].demo = demo; D[i].sea = sea; D[i].seaP = 0;
@@ -658,8 +671,7 @@ else {
     B.masks = masks; B.load(S);
     D.forEach(L => { L.ready = false; L.resize(page.canvas.width, page.canvas.height, dpr); L.page = [vw, vh]; });
     if (st.open >= 0) buildProject(st.open);
-    // the rest in idle time, one at a time, once the index has had its first second
-    PROJ.forEach((_, i) => setTimeout(() => g === gen && buildProject(i), 1400 + i * 300));
+    setTimeout(() => idleBuild(g), 1000);
     window.__stats = { ...B.stats, ms: Math.round(performance.now() - t) };
     reveal(); need();
   };
@@ -668,8 +680,9 @@ else {
   if (reduced) { st.main = 1e3; st.rev = secs.length; }
   let rt = 0;
   addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(build, 160); });
-  index.addEventListener('scroll', () => { reveal(); need(); }, { passive: true });
+  index.addEventListener('scroll', () => { lastBusy = performance.now(); reveal(); need(); }, { passive: true });
   detail.addEventListener('scroll', () => {
+    lastBusy = performance.now();
     const fig = st.open >= 0 && $(`article[data-p=${PROJ[st.open]}] [data-demo]`, detail);
     if (fig && fig.offsetTop < detail.scrollTop + vh * .8) st.drev = 1;
     document.body.classList.toggle('down', detail.scrollTop > vh * .2);
@@ -677,7 +690,10 @@ else {
     need();
   }, { passive: true });
   addEventListener('pointermove', e => { st.ptr = [e.clientX, e.clientY]; need(); });
-  $$('[data-open]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); open(b.dataset.open); }));
+  $$('[data-open]').forEach(b => {
+    b.addEventListener('click', e => { e.preventDefault(); open(b.dataset.open); });
+    b.addEventListener('pointerenter', () => buildProject(PROJ.indexOf(b.dataset.open)));
+  });
   $$('[data-back]').forEach(b => b.addEventListener('click', () => close()));
   addEventListener('keydown', e => { if (e.key === 'Escape' && st.open >= 0) close(); });
   addEventListener('popstate', e => (e.state?.p ? open(e.state.p, false) : st.track > 0 || st.open >= 0 ? slide(0) : null));
