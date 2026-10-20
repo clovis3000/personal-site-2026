@@ -299,12 +299,18 @@ function compose(only = null) {
 
     // stars in the blue, gold, four- and eight-pointed, and a few white
     const stars = [];
-    for (let i = 0; i < 70; i++) {
-      const f = rs.range(.02, .98), rad = Rr * rs.range(.67, .84), [x, y] = at(rad, f), sz = rs.range(3, 7), t = T + .9 + f * .5;
+    for (let i = 0; i < 130; i++) {
+      const f = rs.range(.02, .98), rad = Rr * rs.range(.67, .84), [x, y] = at(rad, f), sz = rs.range(2.6, 6.5), t = T + .9 + f * .5;
       stars.push([x, y]);
       if (i % 4 === 3) { K.disc(x, y, 1.3, WHITE, t, { outline: false }); continue; }
       const pts8 = i % 3 === 0;
       for (let q = 0; q < (pts8 ? 8 : 4); q++) { const an = q * TAU / (pts8 ? 8 : 4) + .2; K.leaf([x, y], [Math.cos(an), Math.sin(an)], q % 2 && pts8 ? sz * .55 : sz, sz * .35, INK, t, { ...G, bend: 0 }); }
+    }
+    // and a dust of white through the blue, finer than the stars, thicker toward the top of the vault
+    for (let i = 0; i < 260; i++) {
+      const f = rs.range(.01, .99), [x, y] = at(Rr * rs.range(.655, .855), f);
+      if (rs() > .35 + Math.sin(f * Math.PI) * .65) continue;
+      K.disc(x, y, rs.range(.6, 1.5), WHITE, T + .95 + f * .45, { outline: false, mask: m1 });
     }
     // the rete: the ecliptic, off centre, a double ring of gold; flame pointers off it, each touching a white star
     const ex = cx, ey = cy - Rr * .12, er = Rr * .62;
@@ -341,7 +347,13 @@ function compose(only = null) {
       K.disc(qx, qy, pr, col, T + 1.6 + i * .08, col === INK ? G : { outline: false });
       if (col === INK) { K.pen(K.ring(qx, qy, pr * 2.2, 28), T + 1.7, { color: WHITE, w: .6, alpha: .7, mask: m3 }); K.disc(qx + pr * 2.2, qy, 1.6, WHITE, T + 1.75, { outline: false }); }
     });
-    for (let i = 0; i < 20; i++) { const f = rs.range(.05, .95), [x, y] = at(Rr * rs.range(.08, .46), f); if (Math.hypot(x - ux, y - uy) > Rr * .25) K.disc(x, y, 1.2, WHITE, T + 1.4 + f * .2, { outline: false, mask: m3 }); }
+    // the inner sky: white dust, and a few small gold stars clear of the orbits
+    for (let i = 0; i < 170; i++) { const f = rs.range(.02, .98), [x, y] = at(Rr * rs.range(.04, .49), f); if (Math.hypot(x - ux, y - uy) > Rr * .235) K.disc(x, y, rs.range(.6, 1.45), WHITE, T + 1.4 + f * .2, { outline: false, mask: m3 }); }
+    for (let i = 0; i < 16; i++) {
+      const f = rs.range(.05, .95), [x, y] = at(Rr * rs.range(.1, .46), f), sz = rs.range(2.5, 5);
+      if (Math.hypot(x - ux, y - uy) < Rr * .26) continue;
+      for (let q = 0; q < 4; q++) { const an = q * TAU / 4 + .2; K.leaf([x, y], [Math.cos(an), Math.sin(an)], sz, sz * .35, INK, T + 1.45 + f * .2, { ...G, bend: 0 }); }
+    }
 
     // the alidade: a gold rule from the centre to the rim, two sight vanes on it, a boss at its pivot
     const al = .2, [ax, ay] = at(Rr * .985, al), ux2 = (ax - cx) / (Rr * .985), uy2 = (ay - cy) / (Rr * .985);
@@ -570,8 +582,9 @@ function close(push = true) {
 }
 
 // the making-of reel: the pin is as tall as the reel is wide, and the page's scroll slides the reel across.
-// The picture nearest the left margin is current: its words go to the fixed line, and if it is a plate, the
-// plate itself is loaded and plays from its start (one at a time, so only one GPU scene ever runs)
+// The picture nearest the left margin is current: its words go to the fixed line, and if it is a plate, its
+// recording plays from the start. Recordings and not the live plates: a plate builds its whole painting on
+// the main thread before its first frame (Meander's river took 630 ms), which froze the scroll mid-reel
 let reelCur = null, reelTimer = 0;
 function reel() {
   const pin = st.open >= 0 && $(`article[data-p=${PROJ[st.open]}] [data-reel]`, detail);
@@ -589,15 +602,15 @@ function reel() {
   line.classList.add('out');
   setTimeout(() => { line.innerHTML = cur.classList.contains('text') ? '' : p ? p.innerHTML : ''; line.classList.remove('out'); }, 250);
   clearTimeout(reelTimer);
-  reelTimer = setTimeout(() => playPlate(cur), 350);
+  reelTimer = setTimeout(() => playPlate(cur), 180);
 }
 function playPlate(card) {
-  for (const f of $$('.card iframe', detail)) if (f.parentNode !== card) f.remove();
-  if (!card?.dataset.plate || $('iframe', card) || reduced) return;
-  const f = document.createElement('iframe');
-  f.src = `plates/${card.dataset.plate}/?embed&pace=1.35`; f.title = card.dataset.plate; f.tabIndex = -1;
-  f.addEventListener('load', () => setTimeout(() => f.classList.add('on'), 150));
-  card.append(f);
+  for (const v of $$('.card video', detail)) if (v.parentNode !== card) { v.pause(); v.removeAttribute('src'); v.load(); v.remove(); }
+  if (!card?.dataset.video || $('video', card) || reduced) return;
+  const v = Object.assign(document.createElement('video'), { muted: true, playsInline: true, preload: 'auto', src: card.dataset.video });
+  v.setAttribute('aria-hidden', 'true');
+  v.addEventListener('playing', () => v.classList.add('on'), { once: true });
+  card.append(v); v.play().catch(() => {});
 }
 
 function buildProject(i) {
