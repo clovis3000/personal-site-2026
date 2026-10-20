@@ -25,7 +25,8 @@
   #track { position: static; display: block; width: auto; height: auto; transform: none !important; }
   .col { width: auto; height: auto; overflow: visible; }
   #detail article[hidden] { display: block; }
-  .open, .back, .built, #rail, .band, .insert canvas { display: none; }
+  .open, .back, #rail, .band, .insert canvas { display: none; }
+  .sheet .go { opacity: 1; transform: none; pointer-events: auto; }
   .insert, .pin, .reelpin { height: auto !important; }
   .insert .sheet, .pin .stage, .reelstage { position: static; height: auto; }
   .reel { position: static; flex-wrap: wrap; }
@@ -41,8 +42,8 @@
         <h1 class="name">Lewis<br>Thompson</h1>
         <p class="lede">Product engineer. I take software from the first sketch to production and keep it running.</p>
         <div class="ways">
-          <button class="built" data-open="making">How this site was built</button>
-          <a class="cue" href="#pum">Portfolio</a>
+          <a class="way" href="#about-making" data-open="making">How this site was built</a>
+          <a class="way cue" href="#pum">See portfolio</a>
         </div>
       </div>
       <div class="art"><div class="plane square" data-plane="square" data-tint="#2340b8" data-pattern="morris"></div></div>
@@ -53,7 +54,7 @@
     <section data-sec="pum" id="pum">
       <div class="text">
         <div class="mon" data-mon="jelly"></div>
-        <h2>Pum</h2>
+        <h2><a class="title" href="#about-pum" data-open="pum">Pum</a></h2>
         <p class="lede">A period and symptom tracker built for endometriosis, for iPhone. Free, no account, and the data stays on her phone.</p>
         <dl class="facts">
           <dt>Shipped</dt><dd>20 July 2026, after a solo build from July 2025; 45 tagged releases since</dd>
@@ -71,7 +72,7 @@
     <section class="flip" data-sec="magi" id="magi">
       <div class="text">
         <div class="mon" data-mon="delta"></div>
-        <h2>Project MAGI</h2>
+        <h2><a class="title" href="#about-magi" data-open="magi">Project MAGI</a></h2>
         <p class="lede">An instrument for the UAP disclosure record. It joins the government’s releases into one mesh where every assertion resolves to a page and a span in the original.</p>
         <dl class="facts">
           <dt>Record</dt><dd>290 documents and 8,900 pages from seven collections, of roughly 116,000</dd>
@@ -89,7 +90,7 @@
     <section data-sec="sea" id="sea">
       <div class="text">
         <div class="mon" data-mon="rose"></div>
-        <h2>Seafaring map</h2>
+        <h2><a class="title" href="#about-sea" data-open="sea">Seafaring map</a></h2>
         <p class="lede">Can free wind and ocean data predict where Bronze Age harbours still lie buried? A treasure hunt across the Arabian Sea.</p>
         <dl class="facts">
           <dt>Model</dt><dd>Seasonal drift and sailing from ERA5 winds and GLORYS currents, over 499 stretches of ancient coast</dd>
@@ -106,7 +107,6 @@
       <div class="text">
         <h2>Write to me</h2>
         <p class="lede"><a href="mailto:lewispthompson.software@proton.me">lewispthompson.software@proton.me</a></p>
-        <p class="aside"><a href="https://lewisthompson.dev/lewis-thompson-resume.pdf">Résumé</a></p>
         <button class="open" data-open="making">How this site was built</button>
       </div>
       <div class="art"><div class="plane half" data-plane="arch" data-tint="#2340b8"></div></div>
@@ -115,12 +115,12 @@
 
   <div class="col" id="detail">
 
-    <article data-p="pum" hidden>
+    <article id="about-pum" data-p="pum" hidden>
       <div class="band" data-band data-tint="#b8325a" data-pattern="morris"></div>
       <div class="body">
         <div class="mon lg" data-mon="jelly"></div>
         <h1>Pum</h1>
-        <a class="visit" href="https://pum.me">pum.me</a>
+        <a class="visit" href="https://pum.me" target="_blank" rel="noopener">pum.me</a>
         <p class="lede">A period and symptom tracker built for endometriosis, for iPhone. Free, no account, and the data stays on her phone.</p>
         <p>Pum is a SwiftUI app over a Rust engine compiled to a static library, with UniFFI-generated Swift bindings. The engine holds cycle detection, the insight models and the hypothesis ledger, so the same code runs in the app, in a macOS test harness and in a simulation CLI.</p>
         <p>Its insights are n-of-1 models over her own history: whether poor sleep precedes pain days for her, say, using a case-crossover estimator, so each person is compared with herself rather than with a population average. An eval harness gates them. A candidate model must show more statistical power than its baseline on simulated data, at a false-positive rate no higher than 5%, before it replaces it.</p>
@@ -130,12 +130,12 @@
       <button class="back end" data-back>All work</button>
     </article>
 
-    <article data-p="magi" hidden>
+    <article id="about-magi" data-p="magi" hidden>
       <div class="band" data-band data-tint="#1f3a8f" data-pattern="trellis"></div>
       <div class="body">
         <div class="mon lg" data-mon="delta"></div>
         <h1>Project MAGI</h1>
-        <a class="visit" href="https://projectmagi.app">projectmagi.app</a>
+        <a class="visit" href="https://projectmagi.app" target="_blank" rel="noopener">projectmagi.app</a>
         <p class="lede">The government’s UAP releases arrive as bulk ZIPs and page-at-a-time viewers. MAGI ingests them, extracts entities, and joins everything into one mesh where every assertion resolves to a page and a span in the original. It takes no position on what UAPs are.</p>
         <p>The pipeline runs OCR, then named-entity extraction, then embeddings, on rented GPUs. Each page gets a quality score, clean, garbled or empty, so bad OCR is counted rather than hidden. Original files live on disk addressed by hash; Postgres holds the text, entities and pgvector embeddings.</p>
         <p>Corpus-extracted data, editorial data and user data are separate provenance tiers that never share a table, so a user’s theory can never sit beside an entity extracted from a government document.</p>
@@ -153,6 +153,7 @@
               <li>Source text and editors’ notes and readers’ theories never share a table. Coverage is checked against each release’s own index.</li>
             </ol>
             <p class="goal">The aim is a record anyone can check. It takes no position on what UAPs are.</p>
+            <a class="go" href="https://projectmagi.app" target="_blank" rel="noopener">Open the record at projectmagi.app</a>
           </div>
           <canvas class="diagram" aria-hidden="true"></canvas>
         </div>
@@ -160,7 +161,7 @@
       <button class="back end" data-back>All work</button>
     </article>
 
-    <article data-p="sea" hidden>
+    <article id="about-sea" data-p="sea" hidden>
       <div class="band" data-band data-tint="#0f7f7a" data-pattern="waves"></div>
       <div class="body">
         <div class="mon lg" data-mon="rose"></div>
@@ -191,7 +192,7 @@
       <button class="back end" data-back>All work</button>
     </article>
 
-    <article data-p="making" hidden>
+    <article id="about-making" data-p="making" hidden>
       <div class="band" data-band data-tint="#c4321c" data-pattern="morris"></div>
       <div class="body">
         <div class="mon lg" data-mon="clasp"></div>
@@ -202,7 +203,7 @@
         <div class="reelstage">
           <p class="reeltext" aria-live="polite"></p>
           <div class="reel">
-            <figure class="card"><img src="making/mood.jpg" alt="The incipit moodboard"><p>It began in <a href="https://github.com/clovis3000/mood">my moodboard tool</a>. Claude reads a board through its command line as easily as I look at it. The seed was one cover of idea magazine where medieval pages and Swiss grids and Japanese type share a spread.</p></figure>
+            <figure class="card"><img src="making/mood.jpg" alt="The incipit moodboard"><p>It began in <a href="https://github.com/clovis3000/mood" target="_blank" rel="noopener">my moodboard tool</a>. Claude reads a board through its command line as easily as I look at it. The seed was one cover of idea magazine where medieval pages and Swiss grids and Japanese type share a spread.</p></figure>
             <figure class="card" data-plate="01-bristle"><img src="making/01.jpg" alt=""><p>The first study was a brush. Each bristle carries its own ink and runs dry on its own.</p></figure>
             <figure class="card" data-plate="02-sumi"><img src="making/02.jpg" alt=""><p>Then ink on the GPU. Water and pigment move through simulated paper fibre and dry darker at the edge.</p></figure>
             <figure class="card" data-plate="04-meander"><img src="making/04.jpg" alt=""><p>A river that migrates and cuts off its own loops. After Harold Fisk’s maps of the Mississippi.</p></figure>

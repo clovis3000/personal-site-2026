@@ -2,7 +2,8 @@
 // sheet. The page's scroll walks it, step by step and back again: an archive unpacks into hashed pages, OCR
 // reads one and scores them all, spans are marked, threads run from spans to entities on the lattice of the
 // trellis above (the ornament become the mesh), and the tables keep source, editors and readers apart. Once
-// the mesh is up, amber packets keep moving along the threads: the one motion that stays.
+// the mesh is up, amber packets keep moving along the threads: the one motion that stays. At the end of the
+// walk the sheet offers the record itself, in a new tab.
 const C = {
   text: '#c7cfd9', dim: '#66707e', amber: '#ffb000', panel: '#0f1319', heat: 'rgba(240, 100, 42, 0.86)',
   line: 'rgba(200, 215, 235, 0.12)', lineDim: 'rgba(200, 215, 235, 0.06)', lineStrong: 'rgba(200, 215, 235, 0.35)',
@@ -24,6 +25,7 @@ const PICK = 2;                                         // the span the reader f
 export function mountMagi(section, scroller) {
   const sheet = section.querySelector('.sheet'), cv = sheet.querySelector('canvas'), x = cv.getContext('2d');
   const steps = [...section.querySelectorAll('.steps li')];
+  const go = section.querySelector('.go');
   let W = 0, H = 0, dpr = 1, p = 0, goal = 0, raf = 0, visible = false, L = null;
 
   function layout() {
@@ -157,6 +159,7 @@ export function mountMagi(section, scroller) {
     p += (goal - p) * .16; if (Math.abs(goal - p) < .002) p = goal;
     const on = Math.min(4, Math.floor(p + .2));
     steps.forEach((li, i) => li.classList.toggle('on', i === on));
+    go?.classList.toggle('on', p > 4.55);
     draw(now / 1000);
     if (visible) raf = requestAnimationFrame(tick);
   }

@@ -65,6 +65,7 @@ function compose(only = null) {
     }
     const cut = { morris: katMorris, trellis: katTrellis, waves: katWaves }[pattern];
     cut(R, col, m, T + .5, s, gild);
+    return m;
   }
 
   // gild(u, v) over the plane's unit square: 2 lays a shape in leaf, 1 traces its lines in gold, 0 leaves it;
@@ -182,86 +183,237 @@ function compose(only = null) {
   }
 
   // corner vines: from a page corner two stems run along its edges, each ending in a curl; acanthus wraps
-  // them in blue, sage and rose; gold ivy hairlines fill in; a gilt boss at the corner itself
+  // them in blue, sage and rose; gold ivy hairlines fill in; a gilt boss at the corner itself. L is one
+  // length or a pair [along x, along y]: a long arm meanders wider, its acanthus thins as it goes, a gold
+  // hairline twines round it, and a blossom hangs near its end
   function corner(x0, y0, sx, sy, L, T, seed) {
-    const rr = rng(97 + seed);
+    const rr = rng(97 + seed), Ls = typeof L === 'number' ? [L, L] : L;
     for (const axis of [0, 1]) {
-      const n = 22, pts = [];
+      const La = Ls[axis], long = La > 360, n = long ? Math.round(La / 15) : 22, amp = long ? 12 : 6, waves = long ? La / 190 : 2.4, pts = [];
       for (let i = 0; i <= n; i++) {
-        const u = i / n, a = 18 + u * (L - 60), b = 18 + Math.sin(u * Math.PI * 2.4 + seed) * 6;
+        const u = i / n, a = 18 + u * (La - 60), b = 18 + (long ? amp * .6 : 0) + Math.sin(u * Math.PI * waves + seed) * amp;
         pts.push(axis ? [x0 + sx * b, y0 + sy * a] : [x0 + sx * a, y0 + sy * b]);
       }
+      const stem = pts.slice();
       // the curl: a log spiral turning in toward the page
-      const [ex, ey] = pts[n], cr = 18, dir = axis ? -sx * sy : sx * sy;
+      const [ex, ey] = pts[n], cr = long ? 22 : 18, dir = axis ? -sx * sy : sx * sy;
       for (let j = 1; j <= 14; j++) {
-        const th = j / 14 * 1.4 * TAU, q = cr * Math.exp(-th * .18), base = axis ? Math.atan2(sy, 0) : Math.atan2(0, sx);
+        const th = j / 14 * 1.4 * TAU, q = cr * Math.exp(-th * .18);
         const c = axis ? [ex + sx * cr, ey] : [ex, ey + sy * cr];
         const an = Math.atan2(ey - c[1], ex - c[0]) + dir * th;
         pts.push([c[0] + Math.cos(an) * q, c[1] + Math.sin(an) * q]);
       }
-      const t0 = T + axis * .15;
-      add({ pts, w: 4.2, bristles: 5, color: hex('#2f5d4a'), alpha: 1, dry: .1, ink: 6, grain: .3, profile: PROFILE.taper, speed: 520, ease: .2, start: t0 });
+      const t0 = T + axis * .15, pace = long ? 1 : .7;
+      add({ pts, w: long ? 4.6 : 4.2, bristles: 5, color: hex('#2f5d4a'), alpha: 1, dry: .1, ink: 6, grain: .3, profile: PROFILE.taper, speed: Math.max(520, La / pace), ease: .2, start: t0 });
+      if (long) {
+        // the twining hairline, in gold, crossing the stem every so often
+        const tw = stem.map(([px, py], i) => {
+          const q = stem[Math.min(n, i + 1)], p0 = stem[Math.max(0, i - 1)], h = Math.atan2(q[1] - p0[1], q[0] - p0[0]), o = Math.sin(i * .9 + seed) * 7 * (1 - i / n * .5);
+          return [px - Math.sin(h) * o, py + Math.cos(h) * o];
+        });
+        K.pen(tw.slice(1, -2), t0 + .25, { color: INK, gold: true, w: 1.2, speed: La / pace });
+      }
       for (let i = 3; i < n - 1; i += 4) {
-        const [px, py] = pts[i], [qx, qy] = pts[i + 1], h = Math.atan2(qy - py, qx - px), j = (i - 3) / 4, side = j % 2 ? 1 : -1;
-        const inward = axis ? (sx > 0 ? 0 : Math.PI) : (sy > 0 ? Math.PI / 2 : -Math.PI / 2);
+        const [px, py] = pts[i], [qx, qy] = pts[i + 1], h = Math.atan2(qy - py, qx - px), j = (i - 3) / 4, side = j % 2 ? 1 : -1, t = t0 + i / n * pace;
+        const inward = axis ? (sx > 0 ? 0 : Math.PI) : (sy > 0 ? Math.PI / 2 : -Math.PI / 2), k = long ? lerp(1.12, .55, i / n) : 1;
         const th0 = side > 0 ? lerp(h, inward, .55) : h + side * .5;
-        K.acanthus(px, py, th0, rr.range(36, 54), side * (axis ? sx : -sy) > 0 ? 1 : -1, rr.range(15, 20), VINE[(j + seed) % VINE.length], t0 + i / n * .7, .5, { lobes: 3 });
+        K.acanthus(px, py, th0, rr.range(36, 54) * k, side * (axis ? sx : -sy) > 0 ? 1 : -1, rr.range(15, 20) * Math.sqrt(k), VINE[(j + seed) % VINE.length], t, .5, { lobes: 3 });
         // a hairline of ivy off the stem, gold leaves on it, a berry
-        const ia = inward + rr.range(-.5, .5), il = rr.range(26, 50), ip = [px + Math.cos(ia) * il, py + Math.sin(ia) * il];
-        K.pen([[px, py], [lerp(px, ip[0], .5) + rr.range(-8, 8), lerp(py, ip[1], .5) + rr.range(-8, 8)], ip], t0 + i / n * .7 + .2, { w: .8, speed: 300 });
-        for (const da of [-.6, 0, .6]) K.leaf(ip, [Math.cos(ia + da), Math.sin(ia + da)], da ? 7 : 10, 5.5, INK, t0 + i / n * .7 + .35, { gold: true, outline: false, bend: 0 });
-        if (i % 2) K.disc(ip[0] + Math.cos(ia) * 12, ip[1] + Math.sin(ia) * 12, 3, VERM, t0 + i / n * .7 + .45);
+        const ia = inward + rr.range(-.5, .5), il = rr.range(26, 50) * (long ? lerp(1, .7, i / n) : 1), ip = [px + Math.cos(ia) * il, py + Math.sin(ia) * il];
+        K.pen([[px, py], [lerp(px, ip[0], .5) + rr.range(-8, 8), lerp(py, ip[1], .5) + rr.range(-8, 8)], ip], t + .2, { w: .8, speed: 300 });
+        for (const da of [-.6, 0, .6]) K.leaf(ip, [Math.cos(ia + da), Math.sin(ia + da)], da ? 7 : 10, 5.5, INK, t + .35, { gold: true, outline: false, bend: 0 });
+        if (i % 2) K.disc(ip[0] + Math.cos(ia) * 12, ip[1] + Math.sin(ia) * 12, 3, VERM, t + .45);
+      }
+      if (long) {
+        // the blossom: hung off the stem on a short hairline, just before the curl
+        const [px, py] = stem[n - 3], inward = axis ? (sx > 0 ? 0 : Math.PI) : (sy > 0 ? Math.PI / 2 : -Math.PI / 2);
+        const bx = px + Math.cos(inward) * 34 + (axis ? 0 : 0), by = py + Math.sin(inward) * 34 + (axis ? -sy * 10 : 0), t = t0 + pace + .1, pal = VINE[(seed + 2) % VINE.length];
+        K.pen([[px, py], [lerp(px, bx, .5), lerp(py, by, .5) - 6], [bx, by]], t, { w: .9, speed: 200 });
+        for (let q = 0; q < 6; q++) { const an = q * TAU / 6 + .3; K.leaf([bx, by], [Math.cos(an), Math.sin(an)], 15, 10, q % 2 ? pal.turn : pal.body, t + .1 + q * .03, { bend: .15 }); }
+        K.disc(bx, by, 5.5, INK, t + .35, { gold: true, outline: false });
+        K.disc(bx, by, 2, VERM, t + .45, { outline: false });
       }
     }
     K.disc(x0 + sx * 18, y0 + sy * 18, 9, INK, T + .05, { gold: true, outline: false });
     K.disc(x0 + sx * 18, y0 + sy * 18, 3.6, VERM, T + .15, { outline: false });
   }
 
-  // the arch of heaven for the last page, after the calendar of the Très Riches Heures: a half-disc in bands,
-  // tiles ruled in gold, a blue zone of gold stars with a scroll and a comet, and a sun raying at the centre
+  // the arch of heaven for the last page: the calendar arch of the Très Riches Heures, built as an instrument.
+  // A great wheel toothed in gold, a pinion and a second gear driving it; a degree scale; a vermilion band
+  // of six signs; the blue zone of stars under an astrolabe's rete, its pointers reaching for them; a band of
+  // tiles; and in the inner blue an orrery round the sun, with an alidade laid across to take a sight
   function arch(R, T) {
     const cx = R.x + R.w / 2, cy = R.y + R.h, Rr = R.w / 2, G = { gold: true, outline: false };
     const at = (rr, a) => [cx - Math.cos(a * Math.PI) * rr, cy - Math.sin(a * Math.PI) * rr];   // a: 0 left .. 1 right
     const arc = (rr, a0 = 0, a1 = 1, n = 90) => Array.from({ length: n + 1 }, (_, i) => at(rr, lerp(a0, a1, i / n)));
     const gl = (pts, t, w = 1.4, o = {}) => add({ pts, pen: true, linear: true, w, color: INK, gold: true, alpha: 1, speed: 700, minDur: .05, ease: .2, start: t, ...o });
+    const bar = (p, q, w, color, t, o = {}) => K.fill([p, q], w, color, t, { outline: false, profile: PROFILE.flat, linear: true, speed: 900, ...o });
+    const rs = rng(5);
     K.pen(arc(Rr), T, { color: SKY, w: .6, speed: 3000 });
     K.pen([[R.x - 30, cy], [R.x + R.w + 30, cy]], T + .05, { color: SKY, w: .6, speed: 3000, linear: true });
-    const m1 = mask(3, cx, cy, Rr * .86, 0), m2 = mask(3, cx, cy, Rr * .64, 0), m3 = mask(3, cx, cy, Rr * .5, 0);
-    K.rect(R.x, R.y, R.w, R.h, ULTRA, T + .2, .4, { outline: false, mask: m1 });
-    K.rect(R.x, R.y, R.w, R.h, WHITE, T + .45, .25, { outline: false, mask: m2 });
-    K.rect(R.x, R.y, R.w, R.h, ULTRA, T + .6, .25, { outline: false, mask: m3 });
-    // the tiled bands: rows of voussoirs ruled in gold, each row's joints halfway between the last's
-    const rows = [[.86, .93, 26], [.93, 1, 26], [.5, .57, 40], [.57, .64, 40]];
-    for (const r0 of [1, .93, .86, .64, .57, .5]) gl(arc(Rr * r0), T + .5 + (1 - r0) * .3, r0 === 1 || r0 === .86 || r0 === .64 || r0 === .5 ? 2.6 : 1.3, { speed: Rr * 4 });
-    rows.forEach(([a, b, n], j) => {
-      for (let k = 0; k <= n; k++) { const f = (k + (j % 2) * .5) / n; if (f > 1) continue; gl([at(Rr * a, f), at(Rr * b, f)], T + .7 + f * .45 + j * .04, 1.3); }
-    });
+
+    // the great wheel's teeth, outside the rim, laid round from the left
+    const NT = 84, pitch = Math.PI * Rr / NT;
+    for (let k = 0; k <= NT; k++) { const f = k / NT; bar(at(Rr * .995, f), at(Rr * 1.055, f), pitch * .52, INK, T + .15 + f * .5, G); }
+    // a gear: gold teeth and a gold disc, a white hub, spokes cut in white
+    const gear = (x, y, r, n, t, phase = 0) => {
+      for (let k = 0; k < n; k++) { const an = phase + k / n * TAU; bar([x + Math.cos(an) * r * .9, y + Math.sin(an) * r * .9], [x + Math.cos(an) * r * 1.2, y + Math.sin(an) * r * 1.2], TAU * r / n * .5, INK, t + k / n * .2, G); }
+      K.disc(x, y, r, INK, t + .1, G);
+      K.disc(x, y, r * .74, ULTRA, t + .25, { outline: false });
+      for (let k = 0; k < 6; k++) { const an = phase + k / 6 * TAU; bar([x, y], [x + Math.cos(an) * r * .72, y + Math.sin(an) * r * .72], Math.max(2.4, r * .1), INK, t + .35, G); }
+      K.disc(x, y, r * .2, INK, t + .4, G);
+      K.disc(x, y, r * .08, VERM, t + .5, { outline: false });
+    };
+    const rp = Rr * .1, [px, py] = at(Rr * (1.055 + .02) + rp * 1.2 - rp * .25, .19);
+    gear(px, py, rp, 12, T + .6, .2);
+    const r2 = Rr * .062, a2 = Math.atan2(cy - py, cx - px) + 1.9, d2 = (rp + r2) * 1.08;
+    gear(px + Math.cos(a2) * d2, py + Math.sin(a2) * d2, r2, 8, T + .75, .4);
+
+    // the bands: vermilion for the signs, blue for the stars, white for the tiles, blue for the sun
+    const mV = mask(3, cx, cy, Rr * .93, 0), m1 = mask(3, cx, cy, Rr * .86, 0), m2 = mask(3, cx, cy, Rr * .64, 0), m3 = mask(3, cx, cy, Rr * .5, 0);
+    K.rect(R.x, R.y, R.w, R.h, VERM, T + .15, .3, { outline: false, mask: mV });
+    K.rect(R.x, R.y, R.w, R.h, ULTRA, T + .25, .4, { outline: false, mask: m1 });
+    K.rect(R.x, R.y, R.w, R.h, WHITE, T + .5, .25, { outline: false, mask: m2 });
+    K.rect(R.x, R.y, R.w, R.h, ULTRA, T + .65, .25, { outline: false, mask: m3 });
+    for (const r0 of [1, .93, .86, .64, .57, .5]) gl(arc(Rr * r0), T + .5 + (1 - r0) * .3, r0 === 1 || r0 === .64 || r0 === .5 ? 2.6 : 1.4, { speed: Rr * 4 });
+
+    // the degree scale: a tick every two degrees, long and gold every ten
+    for (let k = 0; k <= 90; k++) {
+      const f = k / 90, big = k % 5 === 0;
+      if (big) gl([at(Rr * .995, f), at(Rr * .935, f)], T + .8 + f * .4, 1.3);
+      else K.pen([at(Rr * .995, f), at(Rr * .965, f)], T + .8 + f * .4, { w: .7, linear: true, speed: 400 });
+    }
+
+    // six signs in the vermilion band, ruled apart in gold, each drawn in white
+    const W2 = { color: WHITE, w: 1.5, speed: 260 };
+    for (let k = 0; k <= 6; k++) gl([at(Rr * .86, k / 6), at(Rr * .93, k / 6)], T + .9, 1.4);
+    for (let k = 0; k < 6; k++) {
+      const [gx, gy] = at(Rr * .895, (k + .5) / 6), z = Math.min(9, Rr * .022), t = T + 1 + k * .06;
+      if (k === 0) { K.pen(K.ring(gx, gy, z, 24), t, W2); K.disc(gx, gy, 1.6, WHITE, t + .1, { outline: false }); }
+      else if (k === 1) { K.pen(Array.from({ length: 17 }, (_, i) => { const an = -1.1 + i / 16 * 2.2 * 1.25 + .5; return [gx + Math.cos(an + 1.6) * z, gy + Math.sin(an + 1.6) * z]; }), t, W2); K.pen(Array.from({ length: 13 }, (_, i) => { const an = i / 12 * 2.3 - 1.15; return [gx - z * .25 + Math.cos(an + Math.PI) * z * .75, gy + Math.sin(an + Math.PI) * z * .75]; }), t + .05, W2); }
+      else if (k === 2) { K.pen(K.ring(gx, gy - z * .35, z * .62, 20), t, W2); K.pen([[gx, gy + z * .27], [gx, gy + z * 1.15]], t + .05, { ...W2, linear: true }); K.pen([[gx - z * .4, gy + z * .72], [gx + z * .4, gy + z * .72]], t + .08, { ...W2, linear: true }); }
+      else if (k === 3) { K.pen(K.ring(gx - z * .2, gy + z * .2, z * .62, 20), t, W2); K.pen([[gx + z * .24, gy - z * .24], [gx + z * .95, gy - z * .95], [gx + z * .35, gy - z * .95]], t + .05, { ...W2, linear: true }); K.pen([[gx + z * .95, gy - z * .95], [gx + z * .95, gy - z * .35]], t + .08, { ...W2, linear: true }); }
+      else if (k === 4) K.pen([[gx, gy - z], [gx + z * .9, gy + z * .65], [gx - z * .9, gy + z * .65], [gx, gy - z]], t, { ...W2, linear: true });
+      else { K.pen([[gx, gy + z], [gx + z * .9, gy - z * .65], [gx - z * .9, gy - z * .65], [gx, gy + z]], t, { ...W2, linear: true }); K.pen([[gx - z * .5, gy - z * .05], [gx + z * .5, gy - z * .05]], t + .06, { ...W2, linear: true }); }
+    }
+
     // stars in the blue, gold, four- and eight-pointed, and a few white
-    const rs = rng(5);
-    for (let i = 0; i < 90; i++) {
-      const f = rs.range(.02, .98), rad = Rr * rs.range(.66, .84), [x, y] = at(rad, f), sz = rs.range(3, 7), t = T + .9 + f * .5;
+    const stars = [];
+    for (let i = 0; i < 70; i++) {
+      const f = rs.range(.02, .98), rad = Rr * rs.range(.67, .84), [x, y] = at(rad, f), sz = rs.range(3, 7), t = T + .9 + f * .5;
+      stars.push([x, y]);
       if (i % 4 === 3) { K.disc(x, y, 1.3, WHITE, t, { outline: false }); continue; }
       const pts8 = i % 3 === 0;
       for (let q = 0; q < (pts8 ? 8 : 4); q++) { const an = q * TAU / (pts8 ? 8 : 4) + .2; K.leaf([x, y], [Math.cos(an), Math.sin(an)], q % 2 && pts8 ? sz * .55 : sz, sz * .35, INK, t, { ...G, bend: 0 }); }
     }
-    // a sign's boundary, a gold scroll on the left of the zone, a comet on the right
-    gl([at(Rr * .64, .36), at(Rr * .86, .3)], T + 1.0, 1.6);
-    const [sx0, sy0] = at(Rr * .75, .14), sp = [];
-    for (let j = 0; j <= 40; j++) { const th = j / 40 * 2.2 * TAU, q = Rr * .075 * Math.exp(-th * .2); sp.push([sx0 + Math.cos(th + 2) * q, sy0 + Math.sin(th + 2) * q]); }
-    add({ pts: sp, wash: true, w: 4.5, color: INK, gold: true, alpha: 1, rim: 0, profile: u => 1 - u * .7, speed: 300, start: T + 1.1 });
-    for (let j = 2; j < 30; j += 3) { const [px, py] = sp[j], an = Math.atan2(py - sy0, px - sx0); K.leaf([px, py], [Math.cos(an), Math.sin(an)], 13 - j * .25, 6, INK, T + 1.15 + j * .02, { ...G, bend: .3 }); }
+    // the rete: the ecliptic, off centre, a double ring of gold; flame pointers off it, each touching a white star
+    const ex = cx, ey = cy - Rr * .12, er = Rr * .62;
+    gl(K.ring(ex, ey, er, 140), T + 1.25, 3.4, { mask: m1, speed: Rr * 3, linear: false });
+    gl(K.ring(ex, ey, er * .955, 140), T + 1.3, 1.3, { mask: m1, speed: Rr * 3, linear: false });
+    for (const f of [.12, .27, .41, .6, .74, .9]) {
+      const an = Math.PI + f * Math.PI, b0 = [ex + Math.cos(an) * er, ey + Math.sin(an) * er];
+      if (b0[1] > cy - 8) continue;
+      const l = Rr * rs.range(.075, .11), d = [Math.cos(an + .3), Math.sin(an + .3)], tip = [b0[0] + d[0] * l * 1.04, b0[1] + d[1] * l * 1.04];
+      K.disc(b0[0], b0[1], 4, INK, T + 1.4 + f * .2, G);
+      K.leaf(b0, d, l, Math.max(4, l * .17), INK, T + 1.45 + f * .2, { ...G, bend: .3 });
+      K.disc(tip[0], tip[1], 2.8, WHITE, T + 1.6 + f * .2, { outline: false });
+    }
+    // a comet on the right
     const [kx, ky] = at(Rr * .76, .8);
     K.disc(kx, ky, 6, INK, T + 1.2, G);
-    for (let j = 0; j < 9; j++) gl([[kx + 4, ky + 1], [kx + 40 + j * 4, ky + 22 - j * 3.2]], T + 1.25 + j * .02, .9);
-    // the sun: a gold disc off the centre, rayed with fine gold in every direction, kept inside the inner blue
-    const [ux, uy] = [cx + Rr * .08, cy - Rr * .26], sr = Rr * .075;
-    for (let j = 0; j < 84; j++) {
-      const an = j / 84 * TAU + rs.range(-.02, .02), l = sr * rs.range(1.4, j % 3 ? 3.2 : 5.2);
+    for (let j = 0; j < 9; j++) gl([[kx + 4, ky + 1], [kx + 40 + j * 4, ky + 22 - j * 3.2]], T + 1.25 + j * .02, .9, { mask: m1 });
+
+    // the tiled band: two rows of voussoirs ruled in gold, each row's joints halfway between the last's
+    [[.5, .57, 40], [.57, .64, 40]].forEach(([a, b, n], j) => {
+      for (let k = 0; k <= n; k++) { const f = (k + (j % 2) * .5) / n; if (f > 1) continue; gl([at(Rr * a, f), at(Rr * b, f)], T + .75 + f * .45 + j * .04, 1.3); }
+    });
+
+    // the orrery: the sun, rayed in fine gold; orbits in white hairline; a planet on each, one with its moon
+    const [ux, uy] = [cx + Rr * .08, cy - Rr * .25], sr = Rr * .05;
+    for (let j = 0; j < 60; j++) {
+      const an = j / 60 * TAU + rs.range(-.02, .02), l = sr * rs.range(1.3, j % 3 ? 1.75 : 2.15);
       gl([[ux + Math.cos(an) * sr * 1.05, uy + Math.sin(an) * sr * 1.05], [ux + Math.cos(an) * l, uy + Math.sin(an) * l]], T + 1.35 + (j % 12) * .02, j % 3 ? .8 : 1.3, { mask: m3 });
     }
     K.disc(ux, uy, sr, INK, T + 1.3, G);
-    for (let i = 0; i < 26; i++) { const f = rs.range(.05, .95), [x, y] = at(Rr * rs.range(.08, .46), f); if (Math.hypot(x - ux, y - uy) > sr * 3) K.disc(x, y, 1.2, WHITE, T + 1.4 + f * .2, { outline: false, mask: m3 }); }
+    [[.13, 2.2, VERM, 5], [.175, 4.1, SKY, 5.5], [.215, .9, INK, 7]].forEach(([o, an, col, pr], i) => {
+      K.pen(K.ring(ux, uy, Rr * o, 96), T + 1.4 + i * .08, { color: WHITE, w: .9, alpha: .85, speed: Rr * 3, mask: m3 });
+      const qx = ux + Math.cos(an) * Rr * o, qy = uy + Math.sin(an) * Rr * o;
+      K.disc(qx, qy, pr, col, T + 1.6 + i * .08, col === INK ? G : { outline: false });
+      if (col === INK) { K.pen(K.ring(qx, qy, pr * 2.2, 28), T + 1.7, { color: WHITE, w: .6, alpha: .7, mask: m3 }); K.disc(qx + pr * 2.2, qy, 1.6, WHITE, T + 1.75, { outline: false }); }
+    });
+    for (let i = 0; i < 20; i++) { const f = rs.range(.05, .95), [x, y] = at(Rr * rs.range(.08, .46), f); if (Math.hypot(x - ux, y - uy) > Rr * .25) K.disc(x, y, 1.2, WHITE, T + 1.4 + f * .2, { outline: false, mask: m3 }); }
+
+    // the alidade: a gold rule from the centre to the rim, two sight vanes on it, a boss at its pivot
+    const al = .2, [ax, ay] = at(Rr * .985, al), ux2 = (ax - cx) / (Rr * .985), uy2 = (ay - cy) / (Rr * .985);
+    bar([cx, cy], [ax, ay], 5, INK, T + 1.5, { ...G, speed: Rr * 2 });
+    for (const v of [.42, .78]) { const q = [cx + ux2 * Rr * v, cy + uy2 * Rr * v]; bar([q[0] + uy2 * 9, q[1] - ux2 * 9], [q[0] - uy2 * 9, q[1] + ux2 * 9], 4, INK, T + 1.75, G); }
+    K.disc(cx, cy - 1, 11, INK, T + 1.7, G);
+    K.disc(cx, cy - 1, 4, VERM, T + 1.8, { outline: false });
     gl([[R.x - 10, cy], [R.x + R.w + 10, cy]], T + .6, 3);
+  }
+
+  // each project's plane carries a little of the project itself, in one striking colour of its own
+  const AQUA = hex('#11b5a4'), AMBER = hex('#ffb000');
+  function detailing(kind, R, m, T) {
+    const cx = R.x + R.w / 2, cy = R.y + R.h / 2;
+    if (kind === 'pum') {
+      // a cycle round the circle: twenty-eight days on an orbit, five days of a period full, today in gold
+      const ro = Math.min(R.w, R.h) / 2 * 1.1;
+      K.pen(K.ring(cx, cy, ro, 140), T, { color: AQUA, w: 1.6, speed: ro * 5 });
+      for (let d = 0; d < 28; d++) {
+        const an = -Math.PI / 2 + d / 28 * TAU, x = cx + Math.cos(an) * ro, y = cy + Math.sin(an) * ro, t = T + .15 + d * .025;
+        if (d < 5) K.disc(x, y, 8, AQUA, t, { outline: false });
+        else if (d === 19) { K.disc(x, y, 8.5, INK, t, { gold: true, outline: false }); K.leaf([x - Math.cos(an) * 10, y - Math.sin(an) * 10], [-Math.cos(an), -Math.sin(an)], 16, 6, INK, t + .1, { gold: true, outline: false, bend: 0 }); }
+        else if (d >= 12 && d <= 16) K.disc(x, y, 3.6, WHITE, t, { ink: AQUA });
+        else K.disc(x, y, 3.2, AQUA, t, { outline: false });
+      }
+    } else if (kind === 'magi') {
+      // a page tucked under the square's corner; one span on it, in amber, threads into the lattice and runs
+      // knot to knot along its bars, the mesh resolving a claim
+      const pw = Math.max(64, R.w * .17), ph = pw * 1.3, X = R.x - pw * .32, Y = R.y + R.h - ph * .62;
+      K.rect(X + 7, Y + 7, pw, ph, WHITE, T + .1, .12);
+      K.rect(X, Y, pw, ph, WHITE, T + .15, .12);
+      for (let i = 0; i < 8; i++) K.pen([[X + 9, Y + 14 + i * (ph - 26) / 7], [X + 9 + (pw - 18) * (.55 + ((i * 37) % 11) / 11 * .45), Y + 14 + i * (ph - 26) / 7]], T + .25 + i * .015, { color: hex('#9aa0a8'), w: 1.4, linear: true, speed: 900 });
+      const sy0 = Y + 14 + 3 * (ph - 26) / 7, sx0 = X + 12, sx1 = X + pw * .62;
+      K.fill([[sx0, sy0], [sx1, sy0]], 7, AMBER, T + .35, { outline: false, profile: PROFILE.flat, linear: true, speed: 300 });
+      // the trellis's knots: u + v and u - v both fall on its bar spacing, offset by the plane's height
+      const g = Math.max(56, Math.min(96, R.w / 6.5)), knot = (k, j) => [R.x - R.h + (k + j) * g / 2, R.y + (k - j) * g / 2];
+      const inside = ([x, y]) => x > R.x + g * .4 && x < R.x + R.w - g * .4 && y > R.y + g * .4 && y < R.y + R.h - g * .4;
+      let k = 0, j = 0, best = 1e9;
+      const want = [R.x + pw * .68 + g * .6, R.y + R.h - ph * .62 - g * .4];
+      for (let a = -40; a < 80; a++) for (let b = -40; b < 80; b++) { const q = knot(a, b), d = Math.hypot(q[0] - want[0], q[1] - want[1]); if (inside(q) && d < best) { best = d; k = a; j = b; } }
+      const walk = [knot(k, j)], rw = rng(23);
+      for (let n = 0; n < 9; n++) {
+        const up = rw() < .6, nk = up ? k : k + 1, nj = up ? j + 1 : j;
+        if (inside(knot(nk, nj))) { k = nk; j = nj; } else if (inside(knot(up ? k + 1 : k, up ? j : j + 1))) { if (up) k++; else j++; } else break;
+        walk.push(knot(k, j));
+      }
+      const [k0x, k0y] = walk[0];
+      K.pen([[sx1 + 2, sy0], [lerp(sx1, k0x, .5), sy0], [lerp(sx1, k0x, .7), k0y], [k0x, k0y]], T + .42, { color: AMBER, w: 2.4, speed: 1200 });
+      K.pen(walk, T + .5, { color: AMBER, w: 2.6, linear: true, speed: 1300, mask: m });
+      walk.forEach(([x, y], i) => K.fill([[x - 5.5, y], [x + 5.5, y]], 11, AMBER, T + .52 + i * .035, { outline: false, profile: PROFILE.flat, linear: true, speed: 300 }));
+      const [lx, ly] = walk[walk.length - 1];
+      K.fill([[lx - 8, ly], [lx + 8, ly]], 16, INK, T + .85, { gold: true, outline: false, profile: PROFILE.flat, linear: true, speed: 300 });
+    } else if (kind === 'sea') {
+      // a portolan's rhumb lines from a wind rose off centre, a sea road dashed across in vermilion, three
+      // known sites on it, and a gold ring where the model says to dig
+      const bx = R.x + R.w * .38, by = R.y + R.h * .78;
+      for (let k = 0; k < 16; k++) { const an = Math.PI + k / 16 * TAU; K.pen([[bx, by], [bx + Math.cos(an) * R.w, by + Math.sin(an) * R.w]], T + k * .015, { color: VERM, w: k % 2 ? 1 : 1.6, alpha: 1, linear: true, speed: R.w * 2.5, mask: m }); }
+      K.disc(bx, by, 15, WHITE, T + .15, { outline: false, mask: m });
+      for (let k = 0; k < 8; k++) { const an = -Math.PI / 2 + k / 8 * TAU; K.leaf([bx, by], [Math.cos(an), Math.sin(an)], k % 2 ? 13 : 24, k % 2 ? 6 : 8, k % 2 ? VERM : INK, T + .2, { gold: !(k % 2), outline: false, bend: 0 }); }
+      const road = [[.06, .97], [.18, .7], [.34, .52], [.5, .44], [.66, .5], [.8, .66], [.92, .95]].map(([u, v]) => [R.x + R.w * u, R.y + R.h * v]);
+      const sm = [];
+      for (let i = 0; i < road.length - 1; i++) for (let j = 0; j < 8; j++) { const u = j / 8; sm.push([lerp(road[i][0], road[i + 1][0], u), lerp(road[i][1], road[i + 1][1], u)]); }
+      sm.push(road[road.length - 1]);
+      // the road: cased in white so it reads over the waves, then dashed in vermilion
+      K.pen(sm, T + .28, { color: WHITE, w: 9, linear: true, speed: R.w * 3, mask: m });
+      for (let i = 0; i + 2 < sm.length; i += 3) K.pen([sm[i], sm[i + 1], sm[i + 2]], T + .32 + i * .005, { color: VERM, w: 3.6, linear: true, speed: 500, mask: m });
+      for (const i of [1, 3, 5]) { const [x, y] = road[i]; K.disc(x, y, 10, WHITE, T + .5 + i * .03, { outline: false, mask: m }); K.disc(x, y, 7, VERM, T + .53 + i * .03, { outline: false, mask: m }); K.disc(x, y, 2.4, WHITE, T + .58 + i * .03, { outline: false, mask: m }); }
+      const [gx, gy] = [lerp(road[3][0], road[4][0], .55), lerp(road[3][1], road[4][1], .55) - R.h * .12];
+      K.disc(gx, gy, 20, WHITE, T + .68, { outline: false, mask: m });
+      K.pen(K.ring(gx, gy, 13, 40), T + .7, { color: INK, gold: true, w: 3, speed: 300 });
+      for (let k = 0; k < 8; k++) { const an = k / 8 * TAU; K.pen([[gx + Math.cos(an) * 17, gy + Math.sin(an) * 17], [gx + Math.cos(an) * 24, gy + Math.sin(an) * 24]], T + .78, { color: INK, gold: true, w: 2, linear: true }); }
+    }
   }
 
   // ── the index column (or, given a project, only that project's page)
@@ -270,18 +422,18 @@ function compose(only = null) {
     const prev = sec.previousElementSibling;
     if (prev && prev.hasAttribute('data-cloud')) cloud(wr(prev), T, prev.classList.contains('r'));
     const gild = sec.dataset.sec === 'hero' ? heroGild : null;
-    $$('[data-plane]', sec).forEach(el => plane(wr(el), el.dataset, T, .42, gild));
+    $$('[data-plane]', sec).forEach(el => { const R = wr(el), m = plane(R, el.dataset, T, .42, gild); detailing(sec.dataset.sec, R, m, T + 1.25); });
     $$('[data-mon]', sec).forEach((el, j) => mon(wr(el), el.dataset.mon, T + .8 + j * .05));
     if (sec.dataset.sec === 'write') {
-      // vines at the top right and the bottom right, to close the book
+      // vines at the top right and the bottom left, to close the book: the top one runs along, the bottom one up
       const H = wr(sec);
-      corner(H.x + H.w - 1, H.y, -1, 1, Math.min(300, vw * .22), T + 1.2, 2);
-      corner(H.x + H.w - 1, H.y + H.h, -1, -1, Math.min(300, vw * .2), T + 1.4, 3);
+      corner(H.x + H.w - 1, H.y, -1, 1, [Math.min(560, vw * .34), Math.min(240, vh * .26)], T + .5, 2);
+      corner(H.x, H.y + H.h, 1, -1, [Math.min(220, vw * .16), Math.min(620, vh * .62)], T + .7, 3);
     }
     if (sec.dataset.sec === 'hero') {
       // the hero's counterweight, a small vermilion block below the square; a vine in the page's top-left corner
       const R = wr($('[data-plane]', sec)), H = wr(sec);
-      corner(H.x, H.y, 1, 1, Math.min(240, vw * .17), T + .6, 0);
+      corner(H.x, H.y, 1, 1, [Math.min(260, vw * .15), Math.min(760, vh * .8)], T + .3, 0);
       const vm = mask(2, R.x + R.w * .86, R.y + R.h + 22, R.x + R.w, R.y + R.h + 22 + R.w * .14);
       K.rect(R.x + R.w * .86, R.y + R.h + 22, R.w * .14, R.w * .14, VERM, T + 1.4, .2, { outline: false, mask: vm });
     }
@@ -338,7 +490,7 @@ function frame(now) {
   const dt = last && now - last < 100 ? (now - last) / 1000 : 1 / 60; last = now;
   let busy = false;
   // the index's clock: through sections already passed in a rush, the newest at its own pace
-  const tgt = (st.rev + 1) * SPAN;
+  const tgt = (st.rev + 1) * SPAN + (st.rev >= secs.length - 1 ? 1 : 0);   // the last page has nothing after it to finish in
   if (st.main < tgt) { st.main = Math.min(tgt, st.main + dt * (1 + Math.max(0, st.rev * SPAN - st.main) * 3)); busy = true; }
   // a project page's clock: its header, then (once scrolled to) its demonstration, rushing if behind
   if (st.open >= 0) {
@@ -485,7 +637,7 @@ else {
     need();
   }, { passive: true });
   addEventListener('pointermove', e => { st.ptr = [e.clientX, e.clientY]; need(); });
-  $$('[data-open]').forEach(b => b.addEventListener('click', () => open(b.dataset.open)));
+  $$('[data-open]').forEach(b => b.addEventListener('click', e => { e.preventDefault(); open(b.dataset.open); }));
   $$('[data-back]').forEach(b => b.addEventListener('click', () => close()));
   addEventListener('keydown', e => { if (e.key === 'Escape' && st.open >= 0) close(); });
   addEventListener('popstate', e => (e.state?.p ? open(e.state.p, false) : st.track > 0 || st.open >= 0 ? slide(0) : null));

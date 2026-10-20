@@ -26,6 +26,7 @@ section.flip .text { grid-column: 8 / span 5; grid-row: 1; }
 section.flip .art { grid-column: 1 / span 6; grid-row: 1; }
 section .text.wide { grid-column: 1 / span 8; }
 section.hero { padding-top: 10svh; }
+section.hero .text { grid-column: 2 / span 5; }
 section.other { min-height: 70svh; }
 section.write { min-height: 100svh; align-items: end; padding-bottom: 8svh; }
 section.write .text { align-self: start; padding-top: 6svh; }
@@ -41,12 +42,14 @@ section.write .art { grid-column: 4 / span 9; }
 
 /* display: the links' own face, Archivo in tracked capitals, at a middle weight: the modernist half of the page */
 h1, h2 { font-family: Archivo, "Helvetica Neue", sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: .07em; margin: 0 0 .5em; }
-h1.name { font-size: clamp(40px, 5.6vw, 100px); line-height: 1.02; }
+h1.name { font-size: clamp(40px, 5.1vw, 92px); line-height: 1.02; }
 h2 { font-size: clamp(30px, 3.8vw, 66px); line-height: 1.05; }
+h2 .title { text-decoration: none; background: linear-gradient(var(--verm), var(--verm)) 0 100% / 0 2px no-repeat; transition: background-size .35s cubic-bezier(.33, 1, .68, 1); }
+h2 .title:hover, h2 .title:focus-visible { background-size: 100% 2px; outline: none; }
 .lede { font-size: clamp(19px, 1.45vw, 24px); line-height: 1.45; max-width: 30em; margin: 0 0 1.2em; }
 .aside { font: 400 13px/1.5 Archivo, sans-serif; letter-spacing: .02em; color: var(--mute); max-width: 34em; }
 
-dl.facts { display: grid; grid-template-columns: max-content 1fr; margin: 0 0 32px; border-top: 1.5px solid var(--ink); font: 400 14px/1.45 Archivo, sans-serif; }
+dl.facts { display: grid; grid-template-columns: max-content 1fr; margin: 0 0 32px; font: 400 14px/1.45 Archivo, sans-serif; }
 dl.facts dt, dl.facts dd { margin: 0; padding: 10px 0; border-bottom: 1px solid var(--rule); }
 dl.facts dt { color: var(--mute); text-transform: uppercase; letter-spacing: .14em; font-size: 10.5px; padding-right: 28px; padding-top: 12.5px; }
 
@@ -134,15 +137,20 @@ body.away #rail { opacity: 0; pointer-events: none; }
 .steps li.on { color: #c7cfd9; border-left-color: #ffb000; }
 .sheet .goal { margin: auto 0 0; color: #c7cfd9; }
 .sheet canvas { width: 100%; height: 100%; display: block; }
+/* once the scroll has walked the whole pipeline, the sheet offers the record itself */
+.sheet .go { align-self: flex-start; margin-top: 22px; padding: 10px 14px; border: 1px solid #ffb000; color: #ffb000; font: 600 13px/1 Inter, sans-serif; text-decoration: none; opacity: 0; transform: translateY(6px); pointer-events: none; transition: opacity .3s cubic-bezier(.33, 1, .68, 1), transform .3s cubic-bezier(.33, 1, .68, 1), background .2s, color .2s; }
+.sheet .go::after { content: " ↗"; }
+.sheet .go.on { opacity: 1; transform: none; pointer-events: auto; }
+.sheet .go:hover, .sheet .go:focus-visible { background: #ffb000; color: #0b0e11; outline: none; }
 
-/* the ways out of the opening: the making-of, quiet, and the portfolio, a hairline that lets itself down once
-   to a vermilion square, the rail's own mark */
-.ways { display: flex; flex-direction: column; align-items: flex-start; gap: 22px; margin-top: 7svh; }
-.built { font: 500 11px Archivo, sans-serif; letter-spacing: .18em; text-transform: uppercase; color: var(--mute); background: none; border: 0; padding: 0 0 4px; border-bottom: 1px solid var(--rule); cursor: pointer; transition: color .2s, border-color .2s; }
-.built:hover { color: var(--ink); border-color: var(--ink); }
-.cue { position: relative; display: inline-block; font: 500 clamp(15px, 1.15vw, 19px) Archivo, sans-serif; letter-spacing: .32em; text-transform: uppercase; text-decoration: none; color: var(--ink); padding-bottom: calc(11svh + 22px); }
-.cue::after { content: ""; position: absolute; left: 0; top: 2em; width: 1px; height: 11svh; background: var(--ink); transform-origin: top; animation: cue 1.2s 1s cubic-bezier(.33, 1, .68, 1) both; }
-.cue::before { content: ""; position: absolute; left: -3px; top: calc(2em + 11svh); width: 7px; height: 7px; background: var(--verm); animation: cuehead .35s 2.1s cubic-bezier(.33, 1, .68, 1) both; }
+/* the two ways out of the opening, one weight; under the portfolio, a hairline that lets itself down once to
+   a vermilion square, the rail's own mark */
+.ways { display: flex; flex-direction: column; align-items: flex-start; gap: 20px; margin-top: 7svh; }
+.way { position: relative; display: inline-block; font: 500 clamp(13px, 1vw, 16px) Archivo, sans-serif; letter-spacing: .26em; text-transform: uppercase; text-decoration: none; color: var(--ink); padding: 4px 0; background: linear-gradient(var(--verm), var(--verm)) 0 100% / 0 2px no-repeat; transition: background-size .35s cubic-bezier(.33, 1, .68, 1); }
+.way:hover, .way:focus-visible { background-size: 100% 2px; outline: none; }
+.cue { margin-bottom: calc(11svh + 22px); }
+.cue::after { content: ""; position: absolute; left: 0; top: calc(100% + 14px); width: 1px; height: 11svh; background: var(--ink); transform-origin: top; animation: cue 1.2s 1s cubic-bezier(.33, 1, .68, 1) both; }
+.cue::before { content: ""; position: absolute; left: -3px; top: calc(100% + 14px + 11svh); width: 7px; height: 7px; background: var(--verm); animation: cuehead .35s 2.1s cubic-bezier(.33, 1, .68, 1) both; }
 .cue:hover::before { transform: translateY(4px); transition: transform .25s cubic-bezier(.33, 1, .68, 1); }
 @keyframes cue { from { transform: scaleY(0); } }
 @keyframes cuehead { from { opacity: 0; transform: translateY(-8px); } }
