@@ -10,9 +10,9 @@ PORT    := "4747"
 default:
     @just --list --unsorted
 
-# Serve site/ locally at http://127.0.0.1:4747
+# Serve site/ locally at http://127.0.0.1:4747, never cached (see tools/serve.py)
 serve:
-    python3 -m http.server {{PORT}} --bind 127.0.0.1 --directory site
+    python3 tools/serve.py {{PORT}}
 
 # Re-subset the faces into site/fonts. Run after changing a pinned axis or the Latin set.
 fonts:

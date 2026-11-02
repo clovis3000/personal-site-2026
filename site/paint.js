@@ -14,7 +14,7 @@ export const SPAN = 2.2;             // a section's own paint time, played as it
 // so it runs in a worker (paint-worker.js) and the main thread never stalls on it.
 export function paint(plan) {
   const { vw, vh } = plan;
-  const S = [], masks = []; let id = 0, demo = null, sea = null;
+  const S = [], masks = []; let id = 0, demo = null, sea = null, spins = [];
   const phone = vw <= 820;   // the phone layout: the same breakpoint as the CSS's, so painting and text agree
   const r = rng(7);
   const add = o => { const s = new Stroke({ seed: 7919 + ++id, blend: 'source-over', ...o }); S.push(s); return s; };
@@ -220,54 +220,68 @@ export function paint(plan) {
   // A great wheel toothed in gold, a pinion and a second gear driving it; a degree scale; a vermilion band
   // of six signs; the blue zone of stars under an astrolabe's rete, its pointers reaching for them; a band of
   // tiles; and in the inner blue an orrery round the sun, with an alidade laid across to take a sight
+  // The arch of heaven, and the instrument it is: the moving rings are laid a little way round past the horizon,
+  // behind the half-disc's stencil, and tagged into spin groups, so once it is painted it turns (Bristles.spins) and
+  // the stencil keeps the horizon. Ported from incipit's plate 24, Caelum (shared/arcus.js), 2026-11-02. Groups:
+  //   1 the great wheel's teeth   2 the pinion   3 the second gear   4 the zodiac limb (degree scale and signs)
+  //   5 the rete (ecliptic, flame pointers, stars, comet)   6 the tiled band's joints   7-9 the three planets
+  //   10 the alidade   11 the sun's rays
+  // The wheel drives the pinion and the pinion the second gear at their true ratios (equal speed at the teeth).
   function arch(R, T) {
-    const cx = R.x + R.w / 2, cy = R.y + R.h, Rr = R.w / 2, G = { gold: true, outline: false };
-    const at = (rr, a) => [cx - Math.cos(a * Math.PI) * rr, cy - Math.sin(a * Math.PI) * rr];   // a: 0 left .. 1 right
+    const cx = R.x + R.w / 2, cy = R.y + R.h, Rr = R.w / 2, G = { gold: true, outline: false }, n0 = S.length;
+    // on a phone the arch is larger than the screen and runs off its left edge (never its right: past vw is the
+    // next world column), so what would hang there, the gear and the alidade, moves to the right and the comet in
+    const flip = R.x < 0, side = f => (flip ? 1 - f : f), right = x => Math.min(vw - 2, x);
+    const at = (rr, a) => [cx - Math.cos(a * Math.PI) * rr, cy - Math.sin(a * Math.PI) * rr];   // a: 0 left .. 1 right (and on, below the horizon)
     const arc = (rr, a0 = 0, a1 = 1, n = 90) => Array.from({ length: n + 1 }, (_, i) => at(rr, lerp(a0, a1, i / n)));
     const gl = (pts, t, w = 1.4, o = {}) => add({ pts, pen: true, linear: true, w, color: INK, gold: true, alpha: 1, speed: 700, minDur: .05, ease: .2, start: t, ...o });
     const bar = (p, q, w, color, t, o = {}) => K.fill([p, q], w, color, t, { outline: false, profile: PROFILE.flat, linear: true, speed: 900, ...o });
-    const rs = rng(5);
+    const rs = rng(5), vis = f => Math.min(1, Math.max(0, f));   // paint order follows the visible half
     K.pen(arc(Rr), T, { color: SKY, w: .6, speed: 3000 });
-    K.pen([[R.x - 30, cy], [R.x + R.w + 30, cy]], T + .05, { color: SKY, w: .6, speed: 3000, linear: true });
+    K.pen([[R.x - 30, cy], [right(R.x + R.w + 30), cy]], T + .05, { color: SKY, w: .6, speed: 3000, linear: true });
 
-    // the great wheel's teeth, outside the rim, laid round from the left
+    // masks: the bands, and the stencils the turning rings are seen through (each a half-disc, so the horizon holds)
+    const mV = mask(3, cx, cy, Rr * .93, 0), m1 = mask(3, cx, cy, Rr * .86, 0), m2 = mask(3, cx, cy, Rr * .64, 0), m3 = mask(3, cx, cy, Rr * .5, 0);
+    const mW = mask(3, cx, cy, Rr * 1.07, 0), mD = mask(3, cx, cy, Rr * 1.0, 0), mT = mask(3, cx, cy, Rr * .645, 0);
+
+    // the great wheel's teeth, outside the rim, laid round from the left, and on round under the horizon
     const NT = 84, pitch = Math.PI * Rr / NT;
-    for (let k = 0; k <= NT; k++) { const f = k / NT; bar(at(Rr * .995, f), at(Rr * 1.055, f), pitch * .52, INK, T + .15 + f * .5, G); }
-    // a gear: gold teeth and a gold disc, a white hub, spokes cut in white
-    const gear = (x, y, r, n, t, phase = 0) => {
-      for (let k = 0; k < n; k++) { const an = phase + k / n * TAU; bar([x + Math.cos(an) * r * .9, y + Math.sin(an) * r * .9], [x + Math.cos(an) * r * 1.2, y + Math.sin(an) * r * 1.2], TAU * r / n * .5, INK, t + k / n * .2, G); }
-      K.disc(x, y, r, INK, t + .1, G);
-      K.disc(x, y, r * .74, ULTRA, t + .25, { outline: false });
-      for (let k = 0; k < 6; k++) { const an = phase + k / 6 * TAU; bar([x, y], [x + Math.cos(an) * r * .72, y + Math.sin(an) * r * .72], Math.max(2.4, r * .1), INK, t + .35, G); }
-      K.disc(x, y, r * .2, INK, t + .4, G);
-      K.disc(x, y, r * .08, VERM, t + .5, { outline: false });
+    for (let k = 0; k < 2 * NT; k++) { const f = k / NT; bar(at(Rr * .995, f), at(Rr * 1.055, f), pitch * .52, INK, T + .15 + vis(f) * .5, { ...G, spin: 1, mask: mW }); }
+    // a gear: gold teeth and a gold disc, a blue hub, spokes in gold, a vermilion eye; all of it turns with g
+    const gear = (x, y, r, n, t, phase, g) => {
+      const Gs = { ...G, spin: g };
+      for (let k = 0; k < n; k++) { const an = phase + k / n * TAU; bar([x + Math.cos(an) * r * .9, y + Math.sin(an) * r * .9], [x + Math.cos(an) * r * 1.2, y + Math.sin(an) * r * 1.2], TAU * r / n * .5, INK, t + k / n * .2, Gs); }
+      K.disc(x, y, r, INK, t + .1, Gs);
+      K.disc(x, y, r * .74, ULTRA, t + .25, { outline: false, spin: g });
+      for (let k = 0; k < 6; k++) { const an = phase + k / 6 * TAU; bar([x, y], [x + Math.cos(an) * r * .72, y + Math.sin(an) * r * .72], Math.max(2.4, r * .1), INK, t + .35, Gs); }
+      K.disc(x, y, r * .2, INK, t + .4, Gs);
+      K.disc(x, y, r * .08, VERM, t + .5, { outline: false, spin: g });
     };
-    const rp = Rr * .1, [px, py] = at(Rr * (1.055 + .02) + rp * 1.2 - rp * .25, .19);
-    gear(px, py, rp, 12, T + .6, .2);
-    const r2 = Rr * .062, a2 = Math.atan2(cy - py, cx - px) + 1.9, d2 = (rp + r2) * 1.08;
-    if (!phone) gear(px + Math.cos(a2) * d2, py + Math.sin(a2) * d2, r2, 8, T + .75, .4);   // on a phone it would hang off the edge
+    const rp = Rr * .1, [px, py] = at(Rr * (1.055 + .02) + rp * 1.2 - rp * .25, side(.19));
+    gear(px, py, rp, 12, T + .6, .2, 2);
+    const r2 = Rr * .062, a2 = Math.atan2(cy - py, cx - px) + 1.9, d2 = (rp + r2) * 1.08, gx2 = px + Math.cos(a2) * d2, gy2 = py + Math.sin(a2) * d2;
+    if (!phone) gear(gx2, gy2, r2, 8, T + .75, .4, 3);   // on a phone it would hang off the edge
 
     // the bands: vermilion for the signs, blue for the stars, white for the tiles, blue for the sun
-    const mV = mask(3, cx, cy, Rr * .93, 0), m1 = mask(3, cx, cy, Rr * .86, 0), m2 = mask(3, cx, cy, Rr * .64, 0), m3 = mask(3, cx, cy, Rr * .5, 0);
     K.rect(R.x, R.y, R.w, R.h, VERM, T + .15, .3, { outline: false, mask: mV });
     K.rect(R.x, R.y, R.w, R.h, ULTRA, T + .25, .4, { outline: false, mask: m1 });
     K.rect(R.x, R.y, R.w, R.h, WHITE, T + .5, .25, { outline: false, mask: m2 });
     K.rect(R.x, R.y, R.w, R.h, ULTRA, T + .65, .25, { outline: false, mask: m3 });
     for (const r0 of [1, .93, .86, .64, .57, .5]) gl(arc(Rr * r0), T + .5 + (1 - r0) * .3, r0 === 1 || r0 === .64 || r0 === .5 ? 2.6 : 1.4, { speed: Rr * 4 });
 
-    // the degree scale: a tick every two degrees, long and gold every ten
-    for (let k = 0; k <= 90; k++) {
-      const f = k / 90, big = k % 5 === 0;
-      if (big) gl([at(Rr * .995, f), at(Rr * .935, f)], T + .8 + f * .4, 1.3);
-      else K.pen([at(Rr * .995, f), at(Rr * .965, f)], T + .8 + f * .4, { w: .7, linear: true, speed: 400 });
+    // the degree scale: a tick every two degrees, long and gold every ten (a ring that turns: laid a quarter-turn past each end)
+    for (let k = -45; k <= 135; k++) {
+      const f = k / 90, big = ((k % 5) + 5) % 5 === 0;
+      if (big) gl([at(Rr * .995, f), at(Rr * .935, f)], T + .8 + vis(f) * .4, 1.3, { spin: 4, mask: mD });
+      else K.pen([at(Rr * .995, f), at(Rr * .965, f)], T + .8 + vis(f) * .4, { w: .7, linear: true, speed: 400, spin: 4, mask: mD });
     }
 
-    // six signs in the vermilion band, ruled apart in gold, each drawn in white
-    const W2 = { color: WHITE, w: 1.5, speed: 260 };
-    for (let k = 0; k <= 6; k++) gl([at(Rr * .86, k / 6), at(Rr * .93, k / 6)], T + .9, 1.4);
-    for (let k = 0; k < 6; k++) {
-      const [gx, gy] = at(Rr * .895, (k + .5) / 6), z = Math.min(9, Rr * .022), t = T + 1 + k * .06;
-      if (k === 0) { K.pen(K.ring(gx, gy, z, 24), t, W2); K.disc(gx, gy, 1.6, WHITE, t + .1, { outline: false }); }
+    // six signs in the vermilion band, ruled apart in gold, each drawn in white (twelve places round the band, the six repeating)
+    for (let k = -3; k <= 9; k++) gl([at(Rr * .86, k / 6), at(Rr * .93, k / 6)], T + .9, 1.4, { spin: 4, mask: mV });
+    for (let kk = -3; kk < 9; kk++) {
+      const k = ((kk % 6) + 6) % 6, [gx, gy] = at(Rr * .895, (kk + .5) / 6), z = Math.min(9, Rr * .022), t = T + 1 + k * .06;
+      const W2 = { color: WHITE, w: 1.5, speed: 260, spin: 4, mask: mV };
+      if (k === 0) { K.pen(K.ring(gx, gy, z, 24), t, W2); K.disc(gx, gy, 1.6, WHITE, t + .1, { outline: false, spin: 4, mask: mV }); }
       else if (k === 1) { K.pen(Array.from({ length: 17 }, (_, i) => { const an = -1.1 + i / 16 * 2.2 * 1.25 + .5; return [gx + Math.cos(an + 1.6) * z, gy + Math.sin(an + 1.6) * z]; }), t, W2); K.pen(Array.from({ length: 13 }, (_, i) => { const an = i / 12 * 2.3 - 1.15; return [gx - z * .25 + Math.cos(an + Math.PI) * z * .75, gy + Math.sin(an + Math.PI) * z * .75]; }), t + .05, W2); }
       else if (k === 2) { K.pen(K.ring(gx, gy - z * .35, z * .62, 20), t, W2); K.pen([[gx, gy + z * .27], [gx, gy + z * 1.15]], t + .05, { ...W2, linear: true }); K.pen([[gx - z * .4, gy + z * .72], [gx + z * .4, gy + z * .72]], t + .08, { ...W2, linear: true }); }
       else if (k === 3) { K.pen(K.ring(gx - z * .2, gy + z * .2, z * .62, 20), t, W2); K.pen([[gx + z * .24, gy - z * .24], [gx + z * .95, gy - z * .95], [gx + z * .35, gy - z * .95]], t + .05, { ...W2, linear: true }); K.pen([[gx + z * .95, gy - z * .95], [gx + z * .95, gy - z * .35]], t + .08, { ...W2, linear: true }); }
@@ -275,55 +289,54 @@ export function paint(plan) {
       else { K.pen([[gx, gy + z], [gx + z * .9, gy - z * .65], [gx - z * .9, gy - z * .65], [gx, gy + z]], t, { ...W2, linear: true }); K.pen([[gx - z * .5, gy - z * .05], [gx + z * .5, gy - z * .05]], t + .06, { ...W2, linear: true }); }
     }
 
-    // stars in the blue, gold, four- and eight-pointed, and a few white
-    const stars = [];
-    for (let i = 0; i < 130; i++) {
-      const f = rs.range(.02, .98), rad = Rr * rs.range(.67, .84), [x, y] = at(rad, f), sz = rs.range(2.6, 6.5), t = T + .9 + f * .5;
-      stars.push([x, y]);
-      if (i % 4 === 3) { K.disc(x, y, 1.3, WHITE, t, { outline: false }); continue; }
+    // the rete's sky. Stars in the blue, gold, four- and eight-pointed, and a few white
+    const sk = { spin: 5, mask: m1 };
+    for (let i = 0; i < 260; i++) {
+      const f = rs.range(-.55, 1.55), rad = Rr * rs.range(.67, .84), [x, y] = at(rad, f), sz = rs.range(2.6, 6.5), t = T + .9 + vis(f) * .5;
+      if (i % 4 === 3) { K.disc(x, y, 1.3, WHITE, t, { outline: false, ...sk }); continue; }
       const pts8 = i % 3 === 0;
-      for (let q = 0; q < (pts8 ? 8 : 4); q++) { const an = q * TAU / (pts8 ? 8 : 4) + .2; K.leaf([x, y], [Math.cos(an), Math.sin(an)], q % 2 && pts8 ? sz * .55 : sz, sz * .35, INK, t, { ...G, bend: 0 }); }
+      for (let q = 0; q < (pts8 ? 8 : 4); q++) { const an = q * TAU / (pts8 ? 8 : 4) + .2; K.leaf([x, y], [Math.cos(an), Math.sin(an)], q % 2 && pts8 ? sz * .55 : sz, sz * .35, INK, t, { ...G, bend: 0, ...sk }); }
     }
     // and a dust of white through the blue, finer than the stars, thicker toward the top of the vault
-    for (let i = 0; i < 260; i++) {
-      const f = rs.range(.01, .99), [x, y] = at(Rr * rs.range(.655, .855), f);
-      if (rs() > .35 + Math.sin(f * Math.PI) * .65) continue;
-      K.disc(x, y, rs.range(.6, 1.5), WHITE, T + .95 + f * .45, { outline: false, mask: m1 });
+    for (let i = 0; i < 520; i++) {
+      const f = rs.range(-.55, 1.55), [x, y] = at(Rr * rs.range(.655, .855), f);
+      if (rs() > .35 + Math.sin(vis(f) * Math.PI) * .65) continue;
+      K.disc(x, y, rs.range(.6, 1.5), WHITE, T + .95 + vis(f) * .45, { outline: false, ...sk });
     }
     // the rete: the ecliptic, off centre, a double ring of gold; flame pointers off it, each touching a white star
     const ex = cx, ey = cy - Rr * .12, er = Rr * .62;
-    gl(K.ring(ex, ey, er, 140), T + 1.25, 3.4, { mask: m1, speed: Rr * 3, linear: false });
-    gl(K.ring(ex, ey, er * .955, 140), T + 1.3, 1.3, { mask: m1, speed: Rr * 3, linear: false });
+    gl(K.ring(ex, ey, er, 140), T + 1.25, 3.4, { ...sk, speed: Rr * 3, linear: false });
+    gl(K.ring(ex, ey, er * .955, 140), T + 1.3, 1.3, { ...sk, speed: Rr * 3, linear: false });
     for (const f of [.12, .27, .41, .6, .74, .9]) {
       const an = Math.PI + f * Math.PI, b0 = [ex + Math.cos(an) * er, ey + Math.sin(an) * er];
       if (b0[1] > cy - 8) continue;
       const l = Rr * rs.range(.075, .11), d = [Math.cos(an + .3), Math.sin(an + .3)], tip = [b0[0] + d[0] * l * 1.04, b0[1] + d[1] * l * 1.04];
-      K.disc(b0[0], b0[1], 4, INK, T + 1.4 + f * .2, G);
-      K.leaf(b0, d, l, Math.max(4, l * .17), INK, T + 1.45 + f * .2, { ...G, bend: .3 });
-      K.disc(tip[0], tip[1], 2.8, WHITE, T + 1.6 + f * .2, { outline: false });
+      K.disc(b0[0], b0[1], 4, INK, T + 1.4 + f * .2, { ...G, ...sk });
+      K.leaf(b0, d, l, Math.max(4, l * .17), INK, T + 1.45 + f * .2, { ...G, bend: .3, ...sk });
+      K.disc(tip[0], tip[1], 2.8, WHITE, T + 1.6 + f * .2, { outline: false, ...sk });
     }
-    // a comet on the right
-    const [kx, ky] = at(Rr * .76, .8);
-    K.disc(kx, ky, 6, INK, T + 1.2, G);
-    for (let j = 0; j < 9; j++) gl([[kx + 4, ky + 1], [kx + 40 + j * 4, ky + 22 - j * 3.2]], T + 1.25 + j * .02, .9, { mask: m1 });
+    // a comet on the right (on a phone, further in, its tail the other way)
+    const [kx, ky] = at(Rr * .76, flip ? .62 : .8), kd = flip ? -1 : 1;
+    K.disc(kx, ky, 6, INK, T + 1.2, { ...G, ...sk });
+    for (let j = 0; j < 9; j++) gl([[kx + 4 * kd, ky + 1], [kx + (40 + j * 4) * kd, ky + 22 - j * 3.2]], T + 1.25 + j * .02, .9, sk);
 
     // the tiled band: two rows of voussoirs ruled in gold, each row's joints halfway between the last's
     [[.5, .57, 40], [.57, .64, 40]].forEach(([a, b, n], j) => {
-      for (let k = 0; k <= n; k++) { const f = (k + (j % 2) * .5) / n; if (f > 1) continue; gl([at(Rr * a, f), at(Rr * b, f)], T + .75 + f * .45 + j * .04, 1.3); }
+      for (let k = -n / 2; k <= n * 1.5; k++) { const f = (k + (j % 2) * .5) / n; if (f > 1.5) continue; gl([at(Rr * a, f), at(Rr * b, f)], T + .75 + vis(f) * .45 + j * .04, 1.3, { spin: 6, mask: mT }); }
     });
 
     // the orrery: the sun, rayed in fine gold; orbits in white hairline; a planet on each, one with its moon
     const [ux, uy] = [cx + Rr * .08, cy - Rr * .25], sr = Rr * .05;
     for (let j = 0; j < 60; j++) {
       const an = j / 60 * TAU + rs.range(-.02, .02), l = sr * rs.range(1.3, j % 3 ? 1.75 : 2.15);
-      gl([[ux + Math.cos(an) * sr * 1.05, uy + Math.sin(an) * sr * 1.05], [ux + Math.cos(an) * l, uy + Math.sin(an) * l]], T + 1.35 + (j % 12) * .02, j % 3 ? .8 : 1.3, { mask: m3 });
+      gl([[ux + Math.cos(an) * sr * 1.05, uy + Math.sin(an) * sr * 1.05], [ux + Math.cos(an) * l, uy + Math.sin(an) * l]], T + 1.35 + (j % 12) * .02, j % 3 ? .8 : 1.3, { mask: m3, spin: 11 });
     }
     K.disc(ux, uy, sr, INK, T + 1.3, G);
     [[.13, 2.2, VERM, 5], [.175, 4.1, SKY, 5.5], [.215, .9, INK, 7]].forEach(([o, an, col, pr], i) => {
       K.pen(K.ring(ux, uy, Rr * o, 96), T + 1.4 + i * .08, { color: WHITE, w: .9, alpha: .85, speed: Rr * 3, mask: m3 });
-      const qx = ux + Math.cos(an) * Rr * o, qy = uy + Math.sin(an) * Rr * o;
-      K.disc(qx, qy, pr, col, T + 1.6 + i * .08, col === INK ? G : { outline: false });
-      if (col === INK) { K.pen(K.ring(qx, qy, pr * 2.2, 28), T + 1.7, { color: WHITE, w: .6, alpha: .7, mask: m3 }); K.disc(qx + pr * 2.2, qy, 1.6, WHITE, T + 1.75, { outline: false }); }
+      const qx = ux + Math.cos(an) * Rr * o, qy = uy + Math.sin(an) * Rr * o, g = 7 + i;
+      K.disc(qx, qy, pr, col, T + 1.6 + i * .08, col === INK ? { ...G, spin: g } : { outline: false, spin: g });
+      if (col === INK) { K.pen(K.ring(qx, qy, pr * 2.2, 28), T + 1.7, { color: WHITE, w: .6, alpha: .7, mask: m3, spin: g }); K.disc(qx + pr * 2.2, qy, 1.6, WHITE, T + 1.75, { outline: false, spin: g }); }
     });
     // the inner sky: white dust, and a few small gold stars clear of the orbits
     for (let i = 0; i < 170; i++) { const f = rs.range(.02, .98), [x, y] = at(Rr * rs.range(.04, .49), f); if (Math.hypot(x - ux, y - uy) > Rr * .235) K.disc(x, y, rs.range(.6, 1.45), WHITE, T + 1.4 + f * .2, { outline: false, mask: m3 }); }
@@ -334,12 +347,23 @@ export function paint(plan) {
     }
 
     // the alidade: a gold rule from the centre to the rim, two sight vanes on it, a boss at its pivot
-    const al = .2, [ax, ay] = at(Rr * .985, al), ux2 = (ax - cx) / (Rr * .985), uy2 = (ay - cy) / (Rr * .985);
-    bar([cx, cy], [ax, ay], 5, INK, T + 1.5, { ...G, speed: Rr * 2 });
-    for (const v of [.42, .78]) { const q = [cx + ux2 * Rr * v, cy + uy2 * Rr * v]; bar([q[0] + uy2 * 9, q[1] - ux2 * 9], [q[0] - uy2 * 9, q[1] + ux2 * 9], 4, INK, T + 1.75, G); }
+    const al = side(.2), [ax, ay] = at(Rr * .985, al), ux2 = (ax - cx) / (Rr * .985), uy2 = (ay - cy) / (Rr * .985), A = { ...G, spin: 10, mask: mD };
+    bar([cx, cy], [ax, ay], 5, INK, T + 1.5, { ...A, speed: Rr * 2 });
+    for (const v of [.42, .78]) { const q = [cx + ux2 * Rr * v, cy + uy2 * Rr * v]; bar([q[0] + uy2 * 9, q[1] - ux2 * 9], [q[0] - uy2 * 9, q[1] + ux2 * 9], 4, INK, T + 1.75, A); }
     K.disc(cx, cy - 1, 11, INK, T + 1.7, G);
     K.disc(cx, cy - 1, 4, VERM, T + 1.8, { outline: false });
-    gl([[R.x - 10, cy], [R.x + R.w + 10, cy]], T + .6, 3);
+    gl([[R.x - 10, cy], [right(R.x + R.w + 10), cy]], T + .6, 3);
+
+    // the train: the wheel turns the pinion and the pinion the second gear, equal speed at the teeth. It starts once
+    // the arch is painted; the alidade sweeps up from where it rests, so on a phone, resting on the right, the other way
+    const wW = .05, rW = Rr * 1.025, wP = -wW * rW / (rp * 1.05), w2 = -wP * rp / r2;
+    const t0 = Math.max(...S.slice(n0).map(s => s.end)) + .3;
+    spins = [
+      [cx, cy, wW], [px, py, wP], [gx2, gy2, w2],
+      [cx, cy, -.035], [cx, cy, .09], [cx, cy, -.07],
+      [ux, uy, .55], [ux, uy, .32], [ux, uy, .19],
+      [cx, cy, flip ? -.045 : .045], [ux, uy, -.25],
+    ].map(g => [...g, t0]);
   }
 
   // each project's plane carries a little of the project itself, in one striking colour of its own
@@ -406,13 +430,15 @@ export function paint(plan) {
     }
   }
 
-  // ── the index column, its sections up to plan.upto (the hero alone comes first, so it can start painting)
+  // ── the index column, its sections up to plan.upto (the hero alone comes first, so it can start painting).
+  // A section paints in one beat, or in two where its art is stacked below its words (a phone): T for the
+  // words' half, Ta for the art's, each beat a SPAN of the clock, so the art waits until it is scrolled to
   if (plan.kind === 'index') plan.secs.forEach((sec, i) => {
     if (i > plan.upto) return;
-    const T = i * SPAN;
+    const T = sec.beat[0] * SPAN, Ta = sec.beat[1] * SPAN;
     if (sec.cloud) cloud(sec.cloud.R, T, sec.cloud.r);
     const gild = sec.name === 'hero' ? heroGild : null;
-    sec.planes.forEach(p => { const m = plane(p.R, p, T, .42, gild); detailing(sec.name, p.R, m, T + 1.25); });
+    sec.planes.forEach(p => { const m = plane(p.R, p, Ta, .42, gild); detailing(sec.name, p.R, m, Ta + 1.25); });
     sec.mons.forEach((o, j) => mon(o.R, o.kind, T + .8 + j * .05));
     if (sec.name === 'write') {
       // vines at the top right and the bottom left, to close the book: the top one runs along, the bottom one up
@@ -421,22 +447,25 @@ export function paint(plan) {
       // outward leaves aren't cut off
       const top = Math.max(H.y, H.y + H.h - vh);
       if (phone) {
-        // a phone: short sprays, one over the heading's right, one under the arch, clear of both
-        corner(H.x + H.w - 1 - 8, top + 10, -1, 1, [vw * .46, 96], T + .5, 2);
-        corner(H.x, H.y + H.h, 1, -1, [vw * .62, 84], T + .7, 3);
+        // a phone: short sprays, one over the heading's right, one under the arch, clear of both. The top one
+        // hangs from the section's own top: the arch can make the page taller than a short phone, and hung
+        // from the last screen it lands on the heading
+        corner(H.x + H.w - 1 - 8, H.y + 10, -1, 1, [vw * .46, 96], T + .5, 2);
+        corner(H.x, H.y + H.h, 1, -1, [vw * .62, 84], Ta + .7, 3);
       } else {
         corner(H.x + H.w - 1 - 26, top + 30, -1, 1, [Math.min(540, vw * .33), Math.min(230, vh * .25)], T + .5, 2);
-        corner(H.x, H.y + H.h, 1, -1, [Math.min(220, vw * .16), Math.min(620, vh * .62)], T + .7, 3);
+        corner(H.x, H.y + H.h, 1, -1, [Math.min(220, vw * .16), Math.min(620, vh * .62)], Ta + .7, 3);
       }
     }
     if (sec.name === 'hero') {
       // the hero's counterweight, a small vermilion block below the square; a vine in the page's top-left corner
       const R = sec.planes[0].R, H = sec.H;
-      // on a phone the long fall down the left edge would run under the text: a garland along the top instead
-      if (phone) corner(H.x, H.y, 1, 1, [vw * .78, 92], T + .3, 0);
-      else corner(H.x, H.y, 1, 1, [Math.min(260, vw * .15), Math.min(760, vh * .8)], T + .3, 0);
+      // on a phone the long fall down the left edge would run under the text: a garland along the top instead.
+      // Stood down from the top edge, or the leaves off its top arm are cut off by it
+      if (phone) corner(H.x, H.y + 22, 1, 1, [vw * .78, 92], T + .3, 0);
+      else corner(H.x, H.y + 26, 1, 1, [Math.min(260, vw * .15), Math.min(760, vh * .8)], T + .3, 0);
       const vm = mask(2, R.x + R.w * .86, R.y + R.h + 22, R.x + R.w, R.y + R.h + 22 + R.w * .14);
-      K.rect(R.x + R.w * .86, R.y + R.h + 22, R.w * .14, R.w * .14, VERM, T + 1.4, .2, { outline: false, mask: vm });
+      K.rect(R.x + R.w * .86, R.y + R.h + 22, R.w * .14, R.w * .14, VERM, Ta + 1.4, .2, { outline: false, mask: vm });
     }
   });
 
@@ -466,5 +495,5 @@ export function paint(plan) {
     }
   }
 
-  return { S, masks, demo, sea };
+  return { S, masks, demo, sea, spins };
 }

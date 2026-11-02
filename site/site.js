@@ -19,23 +19,41 @@ const PROJ = ['pum', 'magi', 'sea', 'making'];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const index = $('#index'), detail = $('#detail'), track = $('#track'), rail = $('#rail');
-const secs = $$('section[data-sec]', index);
+const secs = $$('section[data-sec]', index), archEl = $('[data-plane="arch"]', index);
 
 const st = { track: 0, from: 0, to: 0, t0: 0, open: -1, main: 0, rev: 0, det: -1, drev: 0, ptr: null, light: null };
 let vw = innerWidth, vh = innerHeight, page, B, raf = 0, last = 0, gen = 0;
 const D = [];   // each project's page has its own layer, painted in the worker once the index has been
+let beats = [];  // the index's clock, in beats: where each starts down the page, and which section's half it is
 
 // ── measuring the page for the painter ─────────────────────────────────────────────────────────────────────
+// A section whose art is stacked under its words (the phone's composition, though this reads the layout and
+// not the width) and starts below the first screen gets a beat of its own for the art, which starts when the
+// art itself comes up the screen. One beat for both, it was painted while still a screen below (2026-11-02)
+function measureBeats() {
+  // reveal() starts a beat once it is above .78 of the screen; none may start further down than the scroll can bring it
+  const out = [], last = index.scrollHeight - vh + vh * .78 - 1;
+  secs.forEach((sec, i) => {
+    out.push({ s: i, y: Math.min(last, sec.offsetTop) });
+    const art = $('.art', sec), text = $('.text', sec);
+    if (!art) return;
+    const a = box(art, index), t = box(text, index);
+    if (a.y >= t.y + t.h && a.y > vh) out.push({ s: i, y: Math.min(last, a.y + Math.min(a.h * .25, vh * .1)), art: true });
+  });
+  return out;
+}
+const beatOf = i => { const k = beats.findIndex(b => b.s === i), a = beats.findIndex(b => b.s === i && b.art); return [k, a < 0 ? k : a]; };
 // The layout as it will rest, not mid-entrance (see .measuring in the CSS), in world units: the index is the
 // world's first column, a project's page its second
 const box = (el, of, x0 = 0) => { const b = el.getBoundingClientRect(), o = of.getBoundingClientRect(); return { x: x0 + b.left - o.left, y: b.top - o.top + of.scrollTop, w: b.width, h: b.height }; };
 function measureIndex() {
   vw = innerWidth; vh = innerHeight;
   document.documentElement.classList.add('measuring'); void index.offsetHeight;
-  const plan = { kind: 'index', vw, vh, upto: 99, secs: secs.map(sec => {
+  beats = measureBeats();
+  const plan = { kind: 'index', vw, vh, upto: 99, secs: secs.map((sec, i) => {
     const prev = sec.previousElementSibling, cl = prev && prev.hasAttribute('data-cloud');
     return {
-      name: sec.dataset.sec, H: box(sec, index),
+      name: sec.dataset.sec, H: box(sec, index), beat: beatOf(i),
       cloud: cl ? { R: box(prev, index), r: prev.classList.contains('r') } : null,
       planes: $$('[data-plane]', sec).map(el => ({ R: box(el, index), plane: el.dataset.plane, tint: el.dataset.tint, pattern: el.dataset.pattern })),
       mons: $$('[data-mon]', sec).map(el => ({ R: box(el, index), kind: el.dataset.mon })),
@@ -65,7 +83,7 @@ try {
   // the worker itself failing to start (a browser without module workers): paint on the page instead
   worker.onerror = e => { console.warn('painter worker failed; painting on the page instead', e.message); worker = null; for (const [id, w] of waiting) { waiting.delete(id); w.res(local(w.plan)); } };
 } catch { worker = null; }
-function local(plan) { try { const { S, masks, demo, sea } = paint(plan); return { L: layout(S), masks, demo, sea }; } catch (e) { return { error: String(e) }; } }
+function local(plan) { try { const { S, masks, demo, sea, spins } = paint(plan); return { L: layout(S), masks, demo, sea, spins }; } catch (e) { return { error: String(e) }; } }
 const job = plan => new Promise(res => {
   if (!worker) return setTimeout(() => res(local(plan)));
   const id = ++seq; waiting.set(id, { res, plan }); worker.postMessage({ id, plan });
@@ -115,8 +133,11 @@ function frame(now) {
   raf = 0;
   const dt = last && now - last < 100 ? (now - last) / 1000 : 1 / 60; last = now;
   let busy = false;
-  // the index's clock: through sections already passed in a rush, the newest at its own pace
-  const tgt = (st.rev + 1) * SPAN + (st.rev >= secs.length - 1 ? 1 : 0);   // the last page has nothing after it to finish in
+  // the index's clock: through beats already passed in a rush, the newest at its own pace. Once the last page is in,
+  // its instrument turns on the same clock, so the clock runs on, but only while the arch is on screen and home
+  const onScreen = el => { const b = el.getBoundingClientRect(); return b.bottom > 0 && b.top < vh; };
+  const turn = !reduced && st.track < .001 && B.spins.length && st.rev >= beats.length - 1 && onScreen(archEl);
+  const tgt = turn ? Infinity : (st.rev + 1) * SPAN + (st.rev >= beats.length - 1 ? 1 : 0);   // the last page has nothing after it to finish in
   if (B.cum && st.main < tgt) { st.main = Math.min(tgt, st.main + dt * (1 + Math.max(0, st.rev * SPAN - st.main) * 3)); busy = true; }
   // a project page's clock: its header, then (once scrolled to) its demonstration, rushing if behind
   if (st.open >= 0) {
@@ -172,7 +193,8 @@ function draw() {
 
 function reveal() {
   const y = index.scrollTop + vh * .78;
-  secs.forEach((s, i) => { if (s.offsetTop < y) { st.rev = Math.max(st.rev, i); s.classList.add('on'); } });
+  secs.forEach(s => { if (s.offsetTop < y) s.classList.add('on'); });
+  beats.forEach((b, k) => { if (b.y < y) st.rev = Math.max(st.rev, k); });
   // the rail follows the section whose middle is nearest the screen's
   let on = 0, best = 1e9;
   secs.forEach((s, i) => { const d = Math.abs(s.offsetTop + s.offsetHeight / 2 - index.scrollTop - vh / 2); if (d < best) { best = d; on = i; } });
@@ -247,13 +269,13 @@ function docs() {
 // The words first: they show as soon as their faces are in, whatever the GPU is doing; the painting follows,
 // the hero alone first so it can start, then the whole index, which replaces it stroke for stroke
 await document.fonts.ready;
-reveal(); performance.mark('words');
+beats = measureBeats(); reveal(); performance.mark('words');
 const dev = await device();
 if (!dev) secs.forEach(s => s.classList.add('on'));
 else {
   page = new GPage(dev); B = page.bristles; $('#gpu').append(page.canvas);
   PROJ.forEach(() => D.push(new Bristles(dev, page.format)));
-  const adoptIndex = ({ L, masks }, what) => { B.masks = masks; B.upload(L); performance.mark(`painting:${what}`, { detail: L.stats }); need(); };
+  const adoptIndex = ({ L, masks, spins }, what) => { B.masks = masks; B.spins = spins || []; B.upload(L); performance.mark(`painting:${what}`, { detail: L.stats }); need(); };
   const build = () => {
     // a window with no size yet (a background or prerendered tab) has nothing to measure: wait for its resize
     if (innerWidth < 2 || innerHeight < 2) return;
@@ -301,5 +323,5 @@ else {
   }));
   const insert = $('[data-insert]'); if (insert) mountMagi(insert, detail);
   if (location.hash.startsWith('#/')) open(location.hash.slice(2), false);
-  window.__site = { st, B, page, draw, open, close };   // for devtools, and for capturing og.png
+  window.__site = { st, B, page, draw, open, close, get beats() { return beats; } };   // for devtools, and for capturing og.png
 }
