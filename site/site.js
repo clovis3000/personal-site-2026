@@ -19,7 +19,7 @@ const PROJ = ['pum', 'magi', 'sea', 'making'];
 const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const $ = (s, el = document) => el.querySelector(s), $$ = (s, el = document) => [...el.querySelectorAll(s)];
 const index = $('#index'), detail = $('#detail'), track = $('#track'), rail = $('#rail');
-const secs = $$('section[data-sec]', index);
+const secs = $$('section[data-sec]', index), archEl = $('[data-plane="arch"]', index);
 
 const st = { track: 0, from: 0, to: 0, t0: 0, open: -1, main: 0, rev: 0, det: -1, drev: 0, ptr: null, light: null };
 let vw = innerWidth, vh = innerHeight, page, B, raf = 0, last = 0, gen = 0;
@@ -83,7 +83,7 @@ try {
   // the worker itself failing to start (a browser without module workers): paint on the page instead
   worker.onerror = e => { console.warn('painter worker failed; painting on the page instead', e.message); worker = null; for (const [id, w] of waiting) { waiting.delete(id); w.res(local(w.plan)); } };
 } catch { worker = null; }
-function local(plan) { try { const { S, masks, demo, sea } = paint(plan); return { L: layout(S), masks, demo, sea }; } catch (e) { return { error: String(e) }; } }
+function local(plan) { try { const { S, masks, demo, sea, spins } = paint(plan); return { L: layout(S), masks, demo, sea, spins }; } catch (e) { return { error: String(e) }; } }
 const job = plan => new Promise(res => {
   if (!worker) return setTimeout(() => res(local(plan)));
   const id = ++seq; waiting.set(id, { res, plan }); worker.postMessage({ id, plan });
@@ -133,8 +133,11 @@ function frame(now) {
   raf = 0;
   const dt = last && now - last < 100 ? (now - last) / 1000 : 1 / 60; last = now;
   let busy = false;
-  // the index's clock: through beats already passed in a rush, the newest at its own pace
-  const tgt = (st.rev + 1) * SPAN + (st.rev >= beats.length - 1 ? 1 : 0);   // the last page has nothing after it to finish in
+  // the index's clock: through beats already passed in a rush, the newest at its own pace. Once the last page is in,
+  // its instrument turns on the same clock, so the clock runs on, but only while the arch is on screen and home
+  const onScreen = el => { const b = el.getBoundingClientRect(); return b.bottom > 0 && b.top < vh; };
+  const turn = !reduced && st.track < .001 && B.spins.length && st.rev >= beats.length - 1 && onScreen(archEl);
+  const tgt = turn ? Infinity : (st.rev + 1) * SPAN + (st.rev >= beats.length - 1 ? 1 : 0);   // the last page has nothing after it to finish in
   if (B.cum && st.main < tgt) { st.main = Math.min(tgt, st.main + dt * (1 + Math.max(0, st.rev * SPAN - st.main) * 3)); busy = true; }
   // a project page's clock: its header, then (once scrolled to) its demonstration, rushing if behind
   if (st.open >= 0) {
@@ -272,7 +275,7 @@ if (!dev) secs.forEach(s => s.classList.add('on'));
 else {
   page = new GPage(dev); B = page.bristles; $('#gpu').append(page.canvas);
   PROJ.forEach(() => D.push(new Bristles(dev, page.format)));
-  const adoptIndex = ({ L, masks }, what) => { B.masks = masks; B.upload(L); performance.mark(`painting:${what}`, { detail: L.stats }); need(); };
+  const adoptIndex = ({ L, masks, spins }, what) => { B.masks = masks; B.spins = spins || []; B.upload(L); performance.mark(`painting:${what}`, { detail: L.stats }); need(); };
   const build = () => {
     // a window with no size yet (a background or prerendered tab) has nothing to measure: wait for its resize
     if (innerWidth < 2 || innerHeight < 2) return;

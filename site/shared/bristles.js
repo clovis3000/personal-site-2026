@@ -34,10 +34,13 @@ const WGSL = /* wgsl */`
 // give each column its own scroll and its own time. One strip whose clock is u.time is the plain case.
 // Masks: a stroke can be confined to a shape (a stencil): mask[2i] holds its numbers, mask[2i+1].x its kind:
 // 1 circle (cx, cy, r), 2 rect (x0, y0, x1, y1), 3 the upper half of a disc (cx, cy, r). Mask 0 is none.
-struct U { view: vec2f, scale: f32, time: f32, clip: vec4f, cols: vec4f, cam: array<vec4f, 8>, mask: array<vec4f, 32> };
+// Spin: a stroke can belong to a spin group 1..15, turning about spin[g-1].xy at spin[g-1].z rad/s from time .w, easing in
+// from rest. The geometry is rotated in the vertex shader (masks, clip and the gold stay where they are), so a ring of
+// ornament can turn inside a fixed stencil. Its column is still chosen by where it was laid, not where it has turned to.
+struct U { view: vec2f, scale: f32, time: f32, clip: vec4f, cols: vec4f, cam: array<vec4f, 8>, mask: array<vec4f, 32>, spin: array<vec4f, 15> };
 @group(0) @binding(0) var<uniform> u: U;
 @group(0) @binding(1) var<storage, read> pts: array<vec4f>;   // x, y, half-width, time the brush gets here
-@group(0) @binding(2) var<storage, read> seg: array<vec2u>;   // first point, bristle << 7 | mask << 3 | clipped << 2 | run ends << 1 | run starts
+@group(0) @binding(2) var<storage, read> seg: array<vec2u>;   // first point, bristle << 11 | spin << 7 | mask << 3 | clipped << 2 | run ends << 1 | run starts
 @group(0) @binding(3) var<storage, read> bri: array<vec4f>;   // colour 0..1, alpha (negative: source-over)
 @group(0) @binding(4) var<storage, read> dep: array<f32>;     // the stroke's overlap depth at each point
 struct V {
@@ -54,6 +57,13 @@ fn dir(p: vec2f, q: vec2f) -> vec2f { let d = q - p; let l = length(d); return s
 // the bisector at p1, shared by the segments either side of it; one function so both get identical bits
 fn cut(p0: vec2f, p1: vec2f, p2: vec2f) -> vec2f { let m = dir(p0, p1) + dir(p1, p2); let l = length(m); return select(dir(p1, p2), m / l, l > 1e-3); }
 fn side(p: vec2f, o: vec2f, m: vec2f) -> f32 { return dot(p - o, m); }
+fn spun(p: vec2f, g: u32, clock: f32) -> vec2f {
+  if (g == 0u) { return p; }
+  let sp = u.spin[g - 1u]; let tau = max(clock - sp.w, 0.0);
+  let a = sp.z * (tau - (1.0 - exp(-2.5 * tau)) / 2.5);
+  let c = cos(a); let sn = sin(a); let d = p - sp.xy;
+  return sp.xy + vec2f(c * d.x - sn * d.y, sn * d.x + c * d.y);
+}
 
 @vertex fn vs(@builtin(vertex_index) vi: u32, @builtin(instance_index) ii: u32) -> V {
   var o: V;
@@ -64,10 +74,12 @@ fn side(p: vec2f, o: vec2f, m: vec2f) -> f32 { return dot(p - o, m); }
   let capA = (s.y & 1u) != 0u;
   var head = (s.y & 2u) != 0u;
   if (!head) { head = pts[k + 2u].w > clock; }                  // the next segment isn't painted yet
-  let d = dir(A.xy, B.xy); let n = vec2f(-d.y, d.x);
+  let g = (s.y >> 7u) & 15u;
+  let Ap = spun(A.xy, g, clock); let Bp = spun(B.xy, g, clock);
+  let d = dir(Ap, Bp); let n = vec2f(-d.y, d.x);
   var mA = d; var mB = d;
-  if (!capA) { mA = cut(pts[k - 1u].xy, A.xy, B.xy); }
-  if (!head) { mB = cut(A.xy, B.xy, pts[k + 2u].xy); }
+  if (!capA) { mA = cut(spun(pts[k - 1u].xy, g, clock), Ap, Bp); }
+  if (!head) { mB = cut(Ap, Bp, spun(pts[k + 2u].xy, g, clock)); }
   // sub-pixel bristles are drawn a pixel wide at reduced coverage, as canvas does
   let px = 1.0 / u.scale;
   // the quad is the shape plus the half pixel its antialiased edge reaches; a quad any larger is mostly
@@ -76,13 +88,13 @@ fn side(p: vec2f, o: vec2f, m: vec2f) -> f32 { return dot(p - o, m); }
   // along the axis a cap needs its radius; a cut line leans out by r·tan(half the turn)
   let back = select(r * abs(d.x * mA.y - d.y * mA.x) / max(dot(d, mA), 0.2) + 0.5 * px, r, capA);
   let fwd = select(r * abs(d.x * mB.y - d.y * mB.x) / max(dot(d, mB), 0.2) + 0.5 * px, r, head);
-  let len = length(B.xy - A.xy);
+  let len = length(Bp - Ap);
   var q = array(vec2f(0, -1), vec2f(1, -1), vec2f(0, 1), vec2f(0, 1), vec2f(1, -1), vec2f(1, 1));
   let c = q[vi];
-  let w = (A.xy - cam.xy - d * back + d * (len + back + fwd) * c.x + n * r * c.y) * u.scale;
+  let w = (Ap - cam.xy - d * back + d * (len + back + fwd) * c.x + n * r * c.y) * u.scale;
   o.pos = vec4f(w.x / u.view.x * 2.0 - 1.0, 1.0 - w.y / u.view.y * 2.0, 0, 1);
-  o.a = vec4f(A.xy, A.z, B.z); o.b = B.xy; o.m = vec4f(mA, mB);
-  o.col = bri[s.y >> 7u]; o.caps = select(0u, 1u, capA) | select(0u, 2u, head) | (s.y & 0x7Cu); o.d = 0.5 * (dep[k] + dep[k + 1u]); o.off = cam.xy;
+  o.a = vec4f(Ap, A.z, B.z); o.b = Bp; o.m = vec4f(mA, mB);
+  o.col = bri[s.y >> 11u]; o.caps = select(0u, 1u, capA) | select(0u, 2u, head) | (s.y & 0x7Cu); o.d = 0.5 * (dep[k] + dep[k + 1u]); o.off = cam.xy;
   return o;
 }
 
@@ -195,7 +207,7 @@ const uAt = (e, ease) => {
 // A stroke as bristles: { P: xy pairs, M: ink mask, r: half-width (number or per sample), col: 0..1, a }.
 // A wash stroke (boneless petal) is one bristle as wide as its envelope, plus its two darker rims.
 function lay(s) {
-  const over = s.blend === 'source-over' || !!s.gold, gold = !!s.gold, clip = !!s.clip, mask = s.mask | 0;
+  const over = s.blend === 'source-over' || !!s.gold, gold = !!s.gold, clip = !!s.clip, mask = s.mask | 0, spin = s.spin | 0;
   if (s.wash) {
     const { x, y, nx, ny, n } = s.path, hw = new Float32Array(n), C = new Float32Array(n * 2), L = new Float32Array(n * 2), R = new Float32Array(n * 2);
     for (let k = 0; k < n; k++) {
@@ -205,12 +217,12 @@ function lay(s) {
     }
     const col = gold ? GOLD : s.color.map(v => v / 255), M = new Uint8Array(n).fill(1), rim = (s.rim ?? 1.1) / 2;
     // rim: 0 is a flat body-colour shape (the ornament kit's), with no rims to lay
-    return { B: [{ P: C, M, r: hw, col, a: s.alpha, over, gold, clip, mask }, ...(rim > 0 ? [L, R] : []).map(P => ({ P, M, r: rim, col, a: Math.min(1, s.alpha * .7), over, gold, clip, mask }))], D: null };
+    return { B: [{ P: C, M, r: hw, col, a: s.alpha, over, gold, clip, mask, spin }, ...(rim > 0 ? [L, R] : []).map(P => ({ P, M, r: rim, col, a: Math.min(1, s.alpha * .7), over, gold, clip, mask, spin }))], D: null };
   }
   s.prepare();
   const B = s.B.map(({ P, M, th, style }) => {
     const [r, g, b, a] = style.match(/[\d.]+/g).map(Number);   // the canvas brush's own rgba(), so colour and alpha match it exactly
-    return { P, M, r: th / 2, col: gold ? GOLD : [r / 255, g / 255, b / 255], a, over, gold, clip, mask };
+    return { P, M, r: th / 2, col: gold ? GOLD : [r / 255, g / 255, b / 255], a, over, gold, clip, mask, spin };
   });
   s.B = null;
   // overlap depth: the inked bristles' summed width over the width they span across the stroke
@@ -262,7 +274,7 @@ export function layout(strokes) {
         for (const v of V) { D[np >> 2] = dep ? dep[v] : 1; P[np] = X[2 * v]; P[np + 1] = X[2 * v + 1]; P[np + 2] = R(v); P[np + 3] = T[v]; np += 4; }
         S = grow(S, 2 * (ns + nv)); when = grow(when, ns + nv);
         for (let i = 0; i < nv - 1; i++) {
-          S[2 * ns] = p0 + i; S[2 * ns + 1] = ib << 7 | b.mask << 3 | (b.clip ? 4 : 0) | (i === 0 ? 1 : 0) | (i === nv - 2 ? 2 : 0);
+          S[2 * ns] = p0 + i; S[2 * ns + 1] = ib << 11 | b.spin << 7 | b.mask << 3 | (b.clip ? 4 : 0) | (i === 0 ? 1 : 0) | (i === nv - 2 ? 2 : 0);
           when[ns++] = T[V[i + 1]];
         }
         k = e - 1;
@@ -283,13 +295,14 @@ export function layout(strokes) {
 export class Bristles {
   constructor(dev, format) {
     this.dev = dev; this.n = 0;
-    this.u = dev.createBuffer({ size: 688, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.u = dev.createBuffer({ size: 928, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.g = dev.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     // what a plate may set: clip [x0, y0, x1, y1]; light [x, y, z] (null: no gold shading); leaf size; folds, fold tilt; bevel
     this.clip = [1e9, 1e9, -1e9, -1e9];
     // columns: colW wide; cams[i] = [offset x, offset y, clock] (null: one column on the plate clock); split and
     // splitCams tell the gold where on screen one column's world gives way to the next
-    this.colW = 1e9; this.cams = null; this.masks = [];   // masks[i - 1] = [kind, a, b, c, d] for stroke.mask = i (1..15)
+    this.colW = 1e9; this.cams = null; this.masks = []; this.spins = [];   // masks[i - 1] = [kind, a, b, c, d] for stroke.mask = i (1..15)
+    // spins[g - 1] = [cx, cy, rad/s, from t] for stroke.spin = g (1..15); a bristle index has 21 bits beside them
      this.split = 1e9; this.splitCams = [0, 0, 0, 0]; this.light = null; this.leaf = 26; this.folds = 0; this.foldTilt = .22; this.bevel = 2.2; this.page = [1600, 1000];
     const m = dev.createShaderModule({ code: WGSL }), cm = dev.createShaderModule({ code: WGSL_COMP });
     const add = { srcFactor: 'one', dstFactor: 'one' }, over = { srcFactor: 'one', dstFactor: 'one-minus-src-alpha' };
@@ -338,10 +351,11 @@ export class Bristles {
   // paint everything the brush has reached by t over what `view` already holds
   render(view, t) {
     if (!this.tAb || !this.gDraw) return;
-    const U = new Float32Array(172); U.set([this.w, this.h, this.scale, t, ...this.clip, this.colW, 8, 0, 0]);
+    const U = new Float32Array(232); U.set([this.w, this.h, this.scale, t, ...this.clip, this.colW, 8, 0, 0]);
     const cams = this.cams || [[0, 0, t]];
     cams.forEach((c, i) => U.set([c[0], c[1], c[2], 0], 12 + i * 4));
     this.masks.slice(0, 15).forEach(([kind, a, b, c, d], i) => { U.set([a, b, c, d], 44 + (i + 1) * 8); U[48 + (i + 1) * 8] = kind; });
+    this.spins.slice(0, 15).forEach(([cx, cy, om, t0], i) => U.set([cx, cy, om, t0], 172 + i * 4));
     this.dev.queue.writeBuffer(this.u, 0, U);
     const L = this.light;
     this.dev.queue.writeBuffer(this.g, 0, new Float32Array([...(L || [0, 0, 1]), L ? 1 : 0, this.leaf, this.scale, this.folds, this.foldTilt, ...this.page, this.bevel, this.split, ...this.splitCams]));
