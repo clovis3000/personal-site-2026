@@ -222,13 +222,16 @@ export function paint(plan) {
   // tiles; and in the inner blue an orrery round the sun, with an alidade laid across to take a sight
   function arch(R, T) {
     const cx = R.x + R.w / 2, cy = R.y + R.h, Rr = R.w / 2, G = { gold: true, outline: false };
+    // on a phone the arch is larger than the screen and runs off its left edge (never its right: past vw is the
+    // next world column), so what would hang there, the gear and the alidade, moves to the right and the comet in
+    const flip = R.x < 0, side = f => (flip ? 1 - f : f), right = x => Math.min(vw - 2, x);
     const at = (rr, a) => [cx - Math.cos(a * Math.PI) * rr, cy - Math.sin(a * Math.PI) * rr];   // a: 0 left .. 1 right
     const arc = (rr, a0 = 0, a1 = 1, n = 90) => Array.from({ length: n + 1 }, (_, i) => at(rr, lerp(a0, a1, i / n)));
     const gl = (pts, t, w = 1.4, o = {}) => add({ pts, pen: true, linear: true, w, color: INK, gold: true, alpha: 1, speed: 700, minDur: .05, ease: .2, start: t, ...o });
     const bar = (p, q, w, color, t, o = {}) => K.fill([p, q], w, color, t, { outline: false, profile: PROFILE.flat, linear: true, speed: 900, ...o });
     const rs = rng(5);
     K.pen(arc(Rr), T, { color: SKY, w: .6, speed: 3000 });
-    K.pen([[R.x - 30, cy], [R.x + R.w + 30, cy]], T + .05, { color: SKY, w: .6, speed: 3000, linear: true });
+    K.pen([[R.x - 30, cy], [right(R.x + R.w + 30), cy]], T + .05, { color: SKY, w: .6, speed: 3000, linear: true });
 
     // the great wheel's teeth, outside the rim, laid round from the left
     const NT = 84, pitch = Math.PI * Rr / NT;
@@ -242,7 +245,7 @@ export function paint(plan) {
       K.disc(x, y, r * .2, INK, t + .4, G);
       K.disc(x, y, r * .08, VERM, t + .5, { outline: false });
     };
-    const rp = Rr * .1, [px, py] = at(Rr * (1.055 + .02) + rp * 1.2 - rp * .25, .19);
+    const rp = Rr * .1, [px, py] = at(Rr * (1.055 + .02) + rp * 1.2 - rp * .25, side(.19));
     gear(px, py, rp, 12, T + .6, .2);
     const r2 = Rr * .062, a2 = Math.atan2(cy - py, cx - px) + 1.9, d2 = (rp + r2) * 1.08;
     if (!phone) gear(px + Math.cos(a2) * d2, py + Math.sin(a2) * d2, r2, 8, T + .75, .4);   // on a phone it would hang off the edge
@@ -303,9 +306,9 @@ export function paint(plan) {
       K.disc(tip[0], tip[1], 2.8, WHITE, T + 1.6 + f * .2, { outline: false });
     }
     // a comet on the right
-    const [kx, ky] = at(Rr * .76, .8);
+    const [kx, ky] = at(Rr * .76, flip ? .62 : .8), sk = flip ? -1 : 1;
     K.disc(kx, ky, 6, INK, T + 1.2, G);
-    for (let j = 0; j < 9; j++) gl([[kx + 4, ky + 1], [kx + 40 + j * 4, ky + 22 - j * 3.2]], T + 1.25 + j * .02, .9, { mask: m1 });
+    for (let j = 0; j < 9; j++) gl([[kx + 4 * sk, ky + 1], [kx + (40 + j * 4) * sk, ky + 22 - j * 3.2]], T + 1.25 + j * .02, .9, { mask: m1 });
 
     // the tiled band: two rows of voussoirs ruled in gold, each row's joints halfway between the last's
     [[.5, .57, 40], [.57, .64, 40]].forEach(([a, b, n], j) => {
@@ -334,12 +337,12 @@ export function paint(plan) {
     }
 
     // the alidade: a gold rule from the centre to the rim, two sight vanes on it, a boss at its pivot
-    const al = .2, [ax, ay] = at(Rr * .985, al), ux2 = (ax - cx) / (Rr * .985), uy2 = (ay - cy) / (Rr * .985);
+    const al = side(.2), [ax, ay] = at(Rr * .985, al), ux2 = (ax - cx) / (Rr * .985), uy2 = (ay - cy) / (Rr * .985);
     bar([cx, cy], [ax, ay], 5, INK, T + 1.5, { ...G, speed: Rr * 2 });
     for (const v of [.42, .78]) { const q = [cx + ux2 * Rr * v, cy + uy2 * Rr * v]; bar([q[0] + uy2 * 9, q[1] - ux2 * 9], [q[0] - uy2 * 9, q[1] + ux2 * 9], 4, INK, T + 1.75, G); }
     K.disc(cx, cy - 1, 11, INK, T + 1.7, G);
     K.disc(cx, cy - 1, 4, VERM, T + 1.8, { outline: false });
-    gl([[R.x - 10, cy], [R.x + R.w + 10, cy]], T + .6, 3);
+    gl([[R.x - 10, cy], [right(R.x + R.w + 10), cy]], T + .6, 3);
   }
 
   // each project's plane carries a little of the project itself, in one striking colour of its own
@@ -423,8 +426,10 @@ export function paint(plan) {
       // outward leaves aren't cut off
       const top = Math.max(H.y, H.y + H.h - vh);
       if (phone) {
-        // a phone: short sprays, one over the heading's right, one under the arch, clear of both
-        corner(H.x + H.w - 1 - 8, top + 10, -1, 1, [vw * .46, 96], T + .5, 2);
+        // a phone: short sprays, one over the heading's right, one under the arch, clear of both. The top one
+        // hangs from the section's own top: the arch can make the page taller than a short phone, and hung
+        // from the last screen it lands on the heading
+        corner(H.x + H.w - 1 - 8, H.y + 10, -1, 1, [vw * .46, 96], T + .5, 2);
         corner(H.x, H.y + H.h, 1, -1, [vw * .62, 84], Ta + .7, 3);
       } else {
         corner(H.x + H.w - 1 - 26, top + 30, -1, 1, [Math.min(540, vw * .33), Math.min(230, vh * .25)], T + .5, 2);
