@@ -406,13 +406,15 @@ export function paint(plan) {
     }
   }
 
-  // ── the index column, its sections up to plan.upto (the hero alone comes first, so it can start painting)
+  // ── the index column, its sections up to plan.upto (the hero alone comes first, so it can start painting).
+  // A section paints in one beat, or in two where its art is stacked below its words (a phone): T for the
+  // words' half, Ta for the art's, each beat a SPAN of the clock, so the art waits until it is scrolled to
   if (plan.kind === 'index') plan.secs.forEach((sec, i) => {
     if (i > plan.upto) return;
-    const T = i * SPAN;
+    const T = sec.beat[0] * SPAN, Ta = sec.beat[1] * SPAN;
     if (sec.cloud) cloud(sec.cloud.R, T, sec.cloud.r);
     const gild = sec.name === 'hero' ? heroGild : null;
-    sec.planes.forEach(p => { const m = plane(p.R, p, T, .42, gild); detailing(sec.name, p.R, m, T + 1.25); });
+    sec.planes.forEach(p => { const m = plane(p.R, p, Ta, .42, gild); detailing(sec.name, p.R, m, Ta + 1.25); });
     sec.mons.forEach((o, j) => mon(o.R, o.kind, T + .8 + j * .05));
     if (sec.name === 'write') {
       // vines at the top right and the bottom left, to close the book: the top one runs along, the bottom one up
@@ -423,20 +425,21 @@ export function paint(plan) {
       if (phone) {
         // a phone: short sprays, one over the heading's right, one under the arch, clear of both
         corner(H.x + H.w - 1 - 8, top + 10, -1, 1, [vw * .46, 96], T + .5, 2);
-        corner(H.x, H.y + H.h, 1, -1, [vw * .62, 84], T + .7, 3);
+        corner(H.x, H.y + H.h, 1, -1, [vw * .62, 84], Ta + .7, 3);
       } else {
         corner(H.x + H.w - 1 - 26, top + 30, -1, 1, [Math.min(540, vw * .33), Math.min(230, vh * .25)], T + .5, 2);
-        corner(H.x, H.y + H.h, 1, -1, [Math.min(220, vw * .16), Math.min(620, vh * .62)], T + .7, 3);
+        corner(H.x, H.y + H.h, 1, -1, [Math.min(220, vw * .16), Math.min(620, vh * .62)], Ta + .7, 3);
       }
     }
     if (sec.name === 'hero') {
       // the hero's counterweight, a small vermilion block below the square; a vine in the page's top-left corner
       const R = sec.planes[0].R, H = sec.H;
-      // on a phone the long fall down the left edge would run under the text: a garland along the top instead
-      if (phone) corner(H.x, H.y, 1, 1, [vw * .78, 92], T + .3, 0);
-      else corner(H.x, H.y, 1, 1, [Math.min(260, vw * .15), Math.min(760, vh * .8)], T + .3, 0);
+      // on a phone the long fall down the left edge would run under the text: a garland along the top instead.
+      // Stood down from the top edge, or the leaves off its top arm are cut off by it
+      if (phone) corner(H.x, H.y + 22, 1, 1, [vw * .78, 92], T + .3, 0);
+      else corner(H.x, H.y + 26, 1, 1, [Math.min(260, vw * .15), Math.min(760, vh * .8)], T + .3, 0);
       const vm = mask(2, R.x + R.w * .86, R.y + R.h + 22, R.x + R.w, R.y + R.h + 22 + R.w * .14);
-      K.rect(R.x + R.w * .86, R.y + R.h + 22, R.w * .14, R.w * .14, VERM, T + 1.4, .2, { outline: false, mask: vm });
+      K.rect(R.x + R.w * .86, R.y + R.h + 22, R.w * .14, R.w * .14, VERM, Ta + 1.4, .2, { outline: false, mask: vm });
     }
   });
 
