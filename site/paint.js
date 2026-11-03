@@ -469,6 +469,22 @@ export function paint(plan) {
     }
   });
 
+  // ── the gate in front of a client's demo (gate/): the hero's corner vine at the top left, its mirror at the
+  // bottom right, framing the form; and the password field as the hero's vermilion block, laid where the page
+  // measured it. One column, one screen, nothing else
+  else if (plan.kind === 'gate') {
+    const F = plan.field;
+    if (F) K.rect(F.x, F.y, F.w, F.h, VERM, .1, .35, { outline: false, mask: mask(2, F.x, F.y, F.x + F.w, F.y + F.h) });
+    if (phone) {
+      corner(0, 22, 1, 1, [vw * .78, 92], .2, 0);
+      // stood up from the bottom edge, or the leaves hanging off its bottom arm are cut by it; the byline sits left of it
+      corner(vw - 1, vh - 40, -1, -1, [vw * .62, 84], .7, 2);
+    } else {
+      corner(0, 26, 1, 1, [Math.min(460, vw * .3), Math.min(640, vh * .7)], .2, 0);
+      corner(vw - 1 - 26, vh - 30, -1, -1, [Math.min(460, vw * .3), Math.min(640, vh * .7)], .7, 2);
+    }
+  }
+
   // ── a project's page, in the world's second column: a band of its plane across the top, its mon
   else {
     const bx = vw, bh = Math.round(vh * .28);
