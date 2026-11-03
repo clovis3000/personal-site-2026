@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Lewis Thompson</title>
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#ffffff">
+<meta name="color-scheme" content="light">
+<!-- nginx serves this page in place of anything under /for/<slug>/ without the right cookie, at that URL, so every path here is absolute -->
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/fonts/archivo.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/newsreader.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/gate/gate.css">
+<script>document.documentElement.classList.add('js')</script>
+
+<div id="gpu"></div>
+
+<main class="gate">
+  <h1 class="for" id="for">&nbsp;</h1>
+  <p class="say">Enter the password Lewis sent you.</p>
+  <form id="form" autocomplete="off">
+    <label class="field" id="field">
+      <span class="vh">Password</span>
+      <input id="pw" type="password" name="password" autocomplete="current-password" autocapitalize="none" autocorrect="off" spellcheck="false" required>
+    </label>
+    <button class="open" type="submit">Open</button>
+  </form>
+  <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  <noscript><p class="msg">This page needs JavaScript to check the password.</p></noscript>
+</main>
+
+<script type="module" src="/gate/gate.js"></script>

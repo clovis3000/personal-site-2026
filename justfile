@@ -25,3 +25,8 @@ deploy:
     rsync -avz --delete --exclude '.DS_Store' site/ {{DROPLET}}:/var/www/lewisthompson/
     ssh {{DROPLET}} 'chown -R www-data:www-data /var/www/lewisthompson'
     curl -sI https://lewisthompson.dev | head -1
+
+# Client demos at https://lewisthompson.dev/for/<slug>/, password-gated: publish, password, name, list, remove, setup
+[positional-arguments]
+demo *args:
+    tools/demos.sh "$@"
